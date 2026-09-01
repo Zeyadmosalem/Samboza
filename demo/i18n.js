@@ -30,8 +30,9 @@ window.I18N = (function () {
     /* people */
     p_mother:'Mother', p_abdo:'Abdo', p_zeyad:'Zeyad', p_rewan:'Rewan',
     p_mona:'Mona', p_grandma:'Grandma', p_marwa:'Marwa', p_uncle:'Uncle',
+    p_adamanas:'Adam & Anas',
     r_mother:'Mother', r_brother:'Big brother', r_son:'Son', r_daughter:'Daughter',
-    r_aunt:'Aunt', r_grandmother:'Grandmother', r_uncle:'Uncle',
+    r_aunt:'Aunt', r_grandmother:'Grandmother', r_uncle:'Uncle', r_cousins:'Cousins',
 
     /* categories */
     c_allowance:'Allowance', c_rent:'Rent', c_food:'Food', c_education:'Education',
@@ -165,8 +166,9 @@ window.I18N = (function () {
 
     p_mother:'الوالدة', p_abdo:'عبده', p_zeyad:'زياد', p_rewan:'روان',
     p_mona:'منى', p_grandma:'الجدة', p_marwa:'مروة', p_uncle:'العم',
+    p_adamanas:'آدم وأنس',
     r_mother:'الوالدة', r_brother:'الأخ الأكبر', r_son:'الابن', r_daughter:'الابنة',
-    r_aunt:'الخالة', r_grandmother:'الجدة', r_uncle:'العم',
+    r_aunt:'الخالة', r_grandmother:'الجدة', r_uncle:'العم', r_cousins:'أولاد الخالة',
 
     c_allowance:'المصروف', c_rent:'الإيجار', c_food:'الأكل', c_education:'التعليم',
     c_medical:'العلاج', c_gifts:'الهدايا', c_car:'السيارة', c_loanrepay:'سداد سلفة',

@@ -472,7 +472,8 @@
           '<div class="card kpi"><div class="k">' + esc(t('this_month')) + ' · ' + esc(I.monthLabel(monthNow, true)) + '</div>' +
             '<div class="v">' + I.n(recips.filter(p => paidThis(p.id)).length) + ' / ' + I.n(recips.length) + '</div>' +
             '<div class="w">' + esc(anyDue ? t('mark_paid') : t('all_paid')) + '</div></div>' +
-          '<div class="card kpi"><div class="k">' + esc(t('logs_spending')) + '</div><div class="v">2 / ' + I.n(recips.length) + '</div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('logs_spending')) + '</div><div class="v">' +
+            I.n(recips.filter(p => p.role === 'member').length) + ' / ' + I.n(recips.length) + '</div>' +
             '<div class="w">' + esc(pname('zeyad')) + ' · ' + esc(pname('rewan')) + '</div></div>' +
         '</div>' +
         (can.write() && anyDue ? '<button class="btn" style="margin-top:16px" data-action="payAll">' + esc(t('pay_all')) + '</button>' : '') +

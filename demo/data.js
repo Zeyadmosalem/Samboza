@@ -13,9 +13,10 @@ window.DEMO = (function () {
     { id:'abdo',    rel:'brother',     role:'admin',  isUser:true,  initials:'A',  color:'#0f9d75', dark:'#14a87e', allowance:0 },
     { id:'zeyad',   rel:'son',         role:'member', isUser:true,  initials:'Z',  color:'#2a78d6', dark:'#3987e5', allowance:3000 },
     { id:'rewan',   rel:'daughter',    role:'member', isUser:true,  initials:'R',  color:'#e87ba4', dark:'#d55181', allowance:3000 },
-    { id:'mona',    rel:'aunt',        role:null,     isUser:false, initials:'Mo', color:'#eb6834', dark:'#d95926', allowance:1500 },
+    { id:'mona',    rel:'aunt',        role:null,     isUser:false, initials:'Mo', color:'#eb6834', dark:'#d95926', allowance:2000 },
     { id:'grandma', rel:'grandmother', role:null,     isUser:false, initials:'G',  color:'#eda100', dark:'#c98500', allowance:2000 },
-    { id:'marwa',   rel:'aunt',        role:null,     isUser:false, initials:'Ma', color:'#1baf7a', dark:'#199e70', allowance:1500 },
+    { id:'marwa',   rel:'aunt',        role:null,     isUser:false, initials:'Ma', color:'#1baf7a', dark:'#199e70', allowance:2000 },
+    { id:'adamanas',rel:'cousins',     role:null,     isUser:false, initials:'A&A',color:'#2aa8a0', dark:'#35bdb4', allowance:2000 },
     { id:'uncle',   rel:'uncle',       role:null,     isUser:false, initials:'U',  color:'#e34948', dark:'#e66767', allowance:0 }
   ];
 
@@ -55,7 +56,7 @@ window.DEMO = (function () {
   // Recurring: rent, groceries, and the five allowances — March to August.
   const foodDays   = [[3,1850],[9,720],[16,2100],[24,1430]];
   const drift      = [0, 140, -90, 260, -180, 75];
-  const recipients = [['zeyad',3000],['rewan',3000],['mona',1500],['grandma',2000],['marwa',1500]];
+  const recipients = [['zeyad',3000],['rewan',3000],['mona',2000],['grandma',2000],['marwa',2000],['adamanas',2000]];
 
   for (let i = 0; i < 6; i++) {
     const m = 3 + i;
