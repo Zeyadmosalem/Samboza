@@ -36,7 +36,37 @@ A private ledger for one family. The mother earns abroad and sends money home; A
 
 ### 2.3 Actor properties
 
-`id`, `display_name`, `relationship` (mother/brother/son/daughter/aunt/grandmother/uncle/external), `is_user` (can log in), `role` (admin | member | viewer), `is_allowance_recipient`, `default_allowance_amount`, `active`, `joined_at`.
+`id` (uuid), `family_id`, `member_no`, `display_name`, `relationship` (mother/brother/son/daughter/aunt/grandmother/cousins/uncle/external), `is_user` (can log in), `auth_user_id`, `role` (admin | member | viewer), `is_allowance_recipient`, `default_allowance_amount`, `active`, `joined_at`.
+
+### 2.4 Identity: family and member IDs
+
+Every family and every actor carries an identifier, in **two deliberately separate layers**.
+
+**Internal — `uuid`.** The primary key of the row. Generated on creation, never shown, never typed, never re-used. It survives a rename, a role change, or a beneficiary being promoted to a full user, so history stays attached to the right person no matter what else changes about them. This is the column row-level security keys on.
+
+**Public — a short code.** What people actually read out, write on a piece of paper, and type into a phone.
+
+| Identifier | Example | Scope | Lifetime |
+|---|---|---|---|
+| **Family code** | `SMBZ-7420` | Global | Permanent. The family's public identity. |
+| **Member number** | `03` | Unique within the family | Permanent once assigned; never re-issued, even if that person leaves. |
+| **Member code** | `SMBZ-7420·03` | Global | Derived (family code + member number), not stored. |
+| **Invite code** | `JOIN-8K2M` | Global while valid | Rotatable and expiring. |
+
+**Why the invite code is not the family code.** They look alike and it is tempting to use one value for both. They must stay separate because they do different jobs: the family code *identifies*, the invite code *grants access*. If they were one value, revoking a leaked invite would mean changing the family's identity — invalidating every code anyone had already written down. Keeping them apart means an invite can be rotated or expired freely, as often as you like, while the family code never moves.
+
+Neither code is a secret. The family code is an address, not a password; possession of it grants nothing. Access comes from authentication plus a `people` row, never from knowing a code.
+
+**Logging in as a family.** Authentication is per-person; the family is the *context* you then work in:
+
+1. The person signs in as themselves — email or phone OTP.
+2. Their `auth_user_id` resolves to one or more `people` rows, each carrying a `family_id`.
+3. If they belong to more than one family, they choose which to open. That choice sets the family context for the session.
+4. Everything from then on is filtered by that `family_id` through RLS.
+
+The indirection matters: one human can belong to several families (Marwa receives from this family and may keep her own), and one family holds people who cannot log in at all. Tying auth to the person rather than the family keeps both cases working without a special case.
+
+**Multi-family from day one.** Every table already carries `family_id` (§6) and every RLS policy is scoped to it, so the schema is multi-tenant while only one family is using it. A second family signing up needs no restructuring: a new family row, a new code, and a fully isolated set of records.
 
 ## 3. Money Model
 
@@ -109,7 +139,7 @@ Properties: **lender name (required)**, **amount (required)**, description (opti
 ## 4. Features by Phase
 
 ### Phase 1 — MVP
-- Sign up / sign in (email or phone OTP); create family; join via invite code
+- Sign up / sign in (email or phone OTP); create a family (issued a permanent family code); join an existing one with a rotatable invite code; switch families if you belong to more than one (§2.4)
 - Record **income** or **expense**: amount, category, date, note, on_behalf_of
 - Default category set (§3.2) + custom categories (Abdo only)
 - **Multi-currency income**: enter in EGP/SAR/USD, store rate + EGP value
@@ -156,11 +186,18 @@ Properties: **lender name (required)**, **amount (required)**, description (opti
 ## 6. Data Model
 
 ```
-families          id, name, base_currency ('EGP'), created_by
+families          id (uuid pk), code (unique, e.g. 'SMBZ-7420'), name,
+                  base_currency ('EGP'), created_by, created_at
 
-people            id, family_id, display_name, relationship,
+family_invites    id, family_id, code (unique), created_by, expires_at,
+                  max_uses, used_count, revoked_at
+                  -- rotatable; separate from families.code by design (§2.4)
+
+people            id (uuid pk), family_id, member_no (unique per family),
+                  display_name, relationship,
                   is_user, auth_user_id (nullable), role (admin|member|viewer),
                   is_allowance_recipient, default_allowance_amount, active, joined_at
+                  -- member_code is derived (families.code + '·' + member_no), never stored
 
 categories        id, family_id, name, kind (income|expense),
                   is_occasional, color, icon, is_default
@@ -201,7 +238,7 @@ transfers         id, family_id, from_person, to_person, amount, status -- Phase
 
 **Derived values (computed, not stored):** member balance = allowances received − expenses submitted; cash on hand = total income EGP − total expenses EGP; car profit and its two splits.
 
-**Security model:** every table carries `family_id`; RLS policies allow access only to rows of your family, with role checks — Abdo (admin) writes everything; Zeyad and Rewan insert only expense rows where `recorded_by = self` and read only their own rows plus family totals; the mother has SELECT on everything and INSERT/UPDATE on nothing.
+**Security model:** every table carries `family_id` (§2.4); RLS policies allow access only to rows of your family, with role checks — Abdo (admin) writes everything; Zeyad and Rewan insert only expense rows where `recorded_by = self` and read only their own rows plus family totals; the mother has SELECT on everything and INSERT/UPDATE on nothing.
 
 ## 7. Screens
 
@@ -219,7 +256,7 @@ See `Family-Finance-App-Mockups.html` for visuals.
 | **Loans** | Abdo (Mother views) | Lender, amount, description, status, repayments |
 | **History** | all (scoped) | Searchable, filterable, grouped by day |
 | **Reports** | Abdo, Mother | Bar, donut, trend, per-person comparison |
-| **People** | Abdo | Add members and beneficiaries, set roles, invite |
+| **People** | Abdo | Add members and beneficiaries, set roles, member IDs, family code and invite |
 | **Settings** | Abdo | Categories, FX rates, export, profile |
 
 ## 8. Roadmap

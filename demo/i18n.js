@@ -104,6 +104,12 @@ window.I18N = (function () {
     ppl_title:'People', ppl_sub:'Everyone the money touches. Beneficiaries who cannot sign in today can be promoted to users later without rewriting history.',
     can_sign_in:'Can sign in', beneficiary:'Beneficiary only', invite_code:'Family invite code',
     invite_hint:'Share this with a new family member', add_person:'Add person', gets_allowance:'Gets allowance',
+    family_identity:'Family identity', family_code:'Family code', member_code:'Member code', id_col:'ID',
+    relationship:'Relationship', role:'Role', new_person_sub:'Beneficiaries can be added without a login and promoted later.',
+    internal_id:'Internal ID (UUID)', invite_expires:'Expires {d}', rotate_invite:'Rotate',
+    id_note:'Two layers. The UUID is the primary key — never shown to anyone, never reused, and it survives a rename. The short code is what people read out and type.',
+    invite_note:'The invite code is separate from the family code on purpose: it grants access, so it has to be revocable without changing who the family is.',
+    signing_into:'Signing in to',
 
     /* settings */
     set_title:'Settings', set_cats:'Categories', set_cats_sub:'Abdo can add to the default set.',
@@ -229,6 +235,12 @@ window.I18N = (function () {
     ppl_title:'الأفراد', ppl_sub:'كل من تمسّه الفلوس. المستفيد الذي لا يسجّل دخولًا اليوم يمكن ترقيته لمستخدم لاحقًا دون إعادة كتابة التاريخ.',
     can_sign_in:'يسجل الدخول', beneficiary:'مستفيد فقط', invite_code:'كود دعوة العائلة',
     invite_hint:'شارك الكود مع فرد جديد من العائلة', add_person:'إضافة شخص', gets_allowance:'يستلم مصروف',
+    family_identity:'هوية العائلة', family_code:'كود العائلة', member_code:'كود الفرد', id_col:'المعرّف',
+    relationship:'صلة القرابة', role:'الصلاحية', new_person_sub:'يمكن إضافة مستفيد بدون حساب وترقيته لاحقًا.',
+    internal_id:'المعرّف الداخلي (UUID)', invite_expires:'ينتهي في {d}', rotate_invite:'تغيير',
+    id_note:'طبقتان. الـ UUID هو المفتاح الأساسي — لا يظهر لأحد ولا يُعاد استخدامه ويبقى كما هو حتى لو تغيّر الاسم. الكود القصير هو اللي الناس تقوله وتكتبه.',
+    invite_note:'كود الدعوة منفصل عن كود العائلة عن قصد: هو بيمنح صلاحية دخول، فلازم نقدر نلغيه من غير ما نغيّر هوية العائلة.',
+    signing_into:'تسجيل الدخول إلى',
 
     set_title:'الإعدادات', set_cats:'التصنيفات', set_cats_sub:'عبده يقدر يضيف على المجموعة الافتراضية.',
     set_fx:'أسعار الصرف', set_fx_sub:'تُدخل مع كل حوالة وتُحفظ مع السجل.',

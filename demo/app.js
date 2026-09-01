@@ -129,6 +129,8 @@
     root.innerHTML =
       '<div class="auth"><div class="auth-card">' +
         '<div class="brandmark">S</div>' +
+        '<div class="famline">' + esc(t('signing_into')) + ' <b>' + esc(t('family')) +
+          '</b> <span class="mono">' + esc(D.FAMILY.code) + '</span></div>' +
         '<h1>' + esc(t('auth_title')) + '</h1>' +
         '<p class="sub">' + esc(t('auth_sub')) + '</p>' +
         '<div class="who">' + users.map(u =>
@@ -774,30 +776,46 @@
   SCREENS.people = {
     html: function () {
       return '<p class="lead">' + esc(t('ppl_sub')) + '</p>' +
-        '<div class="grid split">' +
           '<div class="card"><div class="tablewrap"><table><thead><tr>' +
-            '<th>' + esc(t('person')) + '</th><th>' + esc(t('r_mother')) + '</th><th>' + esc(t('role_admin')) + '</th>' +
+            '<th>' + esc(t('person')) + '</th><th>' + esc(t('id_col')) + '</th>' +
+            '<th>' + esc(t('relationship')) + '</th><th>' + esc(t('role')) + '</th>' +
             '<th>' + esc(t('can_sign_in')) + '</th><th class="num">' + esc(t('gets_allowance')) + '</th></tr></thead><tbody>' +
             D.people.map(p => '<tr>' +
               '<td><span style="display:inline-flex;align-items:center;gap:8px">' +
                 '<span class="avatar sm" style="background:' + hue(p) + '">' + esc(p.initials) + '</span>' + esc(pname(p.id)) + '</span></td>' +
+              '<td><span class="mono" title="' + esc(p.uuid) + '">' + esc(p.code) + '</span></td>' +
               '<td>' + esc(t('r_' + p.rel)) + '</td>' +
               '<td>' + (p.role ? '<span class="pill ' + p.role + '">' + esc(t('role_' + p.role)) + '</span>' :
                 '<span class="pill">' + esc(t('beneficiary')) + '</span>') + '</td>' +
               '<td>' + (p.isUser ? '<span class="pill ok">' + esc(t('can_sign_in')) + '</span>' : '—') + '</td>' +
               '<td class="num">' + (p.allowance ? money(p.allowance) : '—') + '</td></tr>').join('') +
           '</tbody></table></div></div>' +
-          '<div><div class="invite"><div class="c">SMBZ-7420</div><div class="t">' + esc(t('invite_hint')) + '</div></div>' +
-            '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('add_person')) + '</h2>' +
-              '<div class="sub">' + esc(t('ppl_sub')).slice(0, 90) + '…</div></div></div>' +
-              '<div class="field"><label>' + esc(t('person')) + '</label><input class="input" placeholder="' + esc(t('add_person')) + '"></div>' +
-              '<div class="field" style="margin-top:12px"><label>' + esc(t('role_admin')) + '</label>' +
-                '<select class="input"><option>' + esc(t('role_member')) + '</option><option>' + esc(t('role_viewer')) + '</option>' +
-                '<option>' + esc(t('beneficiary')) + '</option></select></div>' +
-              '<button class="btn" style="margin-top:14px;width:100%" disabled>' + esc(t('add_person')) + '</button></div></div>' +
+        '<div class="grid k2" style="margin-top:16px">' + identityCard() +
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('add_person')) + '</h2>' +
+            '<div class="sub">' + esc(t('new_person_sub')) + '</div></div></div>' +
+            '<div class="field"><label>' + esc(t('person')) + '</label><input class="input" placeholder="' + esc(t('add_person')) + '"></div>' +
+            '<div class="field" style="margin-top:12px"><label>' + esc(t('role')) + '</label>' +
+              '<select class="input"><option>' + esc(t('role_member')) + '</option><option>' + esc(t('role_viewer')) + '</option>' +
+              '<option>' + esc(t('beneficiary')) + '</option></select></div>' +
+            '<button class="btn" style="margin-top:14px;width:100%" disabled>' + esc(t('add_person')) + '</button></div>' +
         '</div>';
     }
   };
+
+  function identityCard() {
+    return '<div class="card"><div class="cardhead"><div><h2>' + esc(t('family_identity')) + '</h2>' +
+        '<div class="sub">' + esc(t('id_note')) + '</div></div></div>' +
+      '<div class="idrow"><span class="l">' + esc(t('family_code')) + '</span>' +
+        '<b class="mono big">' + esc(D.FAMILY.code) + '</b></div>' +
+      '<div class="idrow"><span class="l">' + esc(t('internal_id')) + '</span>' +
+        '<b class="mono dim">' + esc(D.FAMILY.id) + '</b></div>' +
+      '<div class="invite" style="margin-top:14px">' +
+        '<div class="c">' + esc(D.FAMILY.invite) + '</div>' +
+        '<div class="t">' + esc(t('invite_hint')) + ' · ' +
+          esc(t('invite_expires', { d: I.date(D.FAMILY.inviteExpires, true) })) + '</div></div>' +
+      '<p class="sub" style="margin-top:12px">' + esc(t('invite_note')) + '</p>' +
+    '</div>';
+  }
 
   /* Settings */
   SCREENS.settings = {
@@ -818,6 +836,10 @@
             '<div class="sub">' + esc(t('set_fx_sub')) + '</div></div></div>' +
             '<div class="calcrow"><span class="l">1 SAR</span><b>' + I.n(D.RATES.SAR * 100) / 100 + ' ' + esc(t('egp')) + '</b></div>' +
             '<div class="calcrow"><span class="l">1 USD</span><b>' + D.RATES.USD + ' ' + esc(t('egp')) + '</b></div></div>' +
+          '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('family_identity')) + '</h2></div></div>' +
+            '<div class="idrow"><span class="l">' + esc(t('family_code')) + '</span><b class="mono">' + esc(D.FAMILY.code) + '</b></div>' +
+            '<div class="idrow"><span class="l">' + esc(t('member_code')) + '</span><b class="mono">' + esc(state.user.code) + '</b></div>' +
+            '<div class="idrow"><span class="l">' + esc(t('internal_id')) + '</span><b class="mono dim">' + esc(state.user.uuid) + '</b></div></div>' +
           '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('set_lang')) + '</h2></div>' +
             '<div class="spacer"></div>' + langToggle() + '</div>' +
             '<div class="calcrow"><span class="l">' + esc(t('set_export')) + '</span>' +

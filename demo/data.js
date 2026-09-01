@@ -20,6 +20,43 @@ window.DEMO = (function () {
     { id:'uncle',   rel:'uncle',       role:null,     isUser:false, initials:'U',  color:'#e34948', dark:'#e66767', allowance:0 }
   ];
 
+  /* ---- identity (§2.4) ------------------------------------------------
+     Two layers, deliberately separate:
+       uuid  — the primary key. Never shown, never typed, never reused.
+               Survives a rename. This is what row-level security keys on.
+       code  — the short public identifier people read out and type.
+     The family code is permanent; the invite code is a separate, rotatable
+     grant of access. Conflating them would mean a leaked invite could only
+     be revoked by changing the family's identity. -------------------------- */
+  const FAMILY = {
+    id:      '7f3c1a9e-4b2d-4e18-9c05-a1d6f2e83b47',
+    code:    'SMBZ-7420',
+    name:    'Samboza',
+    currency:'EGP',
+    createdBy:'abdo',
+    invite:  'JOIN-8K2M',
+    inviteExpires: new Date(2026, 8, 30)
+  };
+
+  // member_no is unique within the family, not globally.
+  const IDENTITY = {
+    mother:  ['c4a1e07b-9d32-4f6a-8b15-2e7c9a04d3f8', '01'],
+    abdo:    ['1b8f3d52-6a04-4c9e-b7d1-58e2f60a9c34', '02'],
+    zeyad:   ['9e2d7a41-3f85-4b06-a9c7-d41528b3e6f0', '03'],
+    rewan:   ['5a6c8b13-2e79-4d40-8f3b-91a07d5c2e68', '04'],
+    mona:    ['e30b4f96-7c15-4a82-b6d9-034e1f7a58c2', '05'],
+    grandma: ['2d95c6e8-b174-4093-8a2f-6c5d81e04b73', '06'],
+    marwa:   ['84f0a3d7-51c9-4e26-9b48-7d3216fa0c95', '07'],
+    adamanas:['6c17e9b4-08a2-4d5f-b391-e5407c8a2d16', '08'],
+    uncle:   ['3fa62d08-9e41-4c73-85b6-1207de95f3a4', '09']
+  };
+  people.forEach(function (p) {
+    p.uuid     = IDENTITY[p.id][0];
+    p.no       = IDENTITY[p.id][1];
+    p.code     = FAMILY.code + '·' + p.no;   // e.g. SMBZ-7420·03
+    p.familyId = FAMILY.id;
+  });
+
   /* ---- categories (§3.2). Colour is fixed per category, never by rank.
      The five largest carry validated categorical slots 1–5; the rest are
      neutral and fold into a single "Other" slice in the donut. --------- */
@@ -183,6 +220,6 @@ window.DEMO = (function () {
     });
   }
 
-  return { TODAY, RATES, people, categories, tx, remittances, settlements,
+  return { TODAY, RATES, FAMILY, people, categories, tx, remittances, settlements,
            loans, allowances, memberTx, add, uid };
 })();
