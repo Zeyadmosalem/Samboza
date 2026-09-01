@@ -1,0 +1,318 @@
+<!-- Family Finance App — UI Mockups (5 main screens) -->
+<div id="mockups">
+<style>
+  #mockups { --bg:#f2f4f3; --card:#ffffff; --ink:#15201c; --sub:#6b7a74; --line:#e5eae8;
+    --accent:#0f9d75; --accent-soft:#e2f3ed; --red:#d64545; --red-soft:#fbe9e9;
+    --blue:#3a7bd5; --amber:#e0a52e; --purple:#8a5cc7; --teal:#2aa8a0;
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--ink);
+    background:var(--bg); padding:28px 16px; }
+  #mockups * { box-sizing:border-box; margin:0; }
+  #mockups h1 { font-size:20px; text-align:center; margin-bottom:4px; }
+  #mockups .subtitle { text-align:center; color:var(--sub); font-size:13px; margin-bottom:24px; }
+  #mockups .row { display:flex; flex-wrap:wrap; gap:26px; justify-content:center; }
+  .phone { width:300px; }
+  .phone .label { text-align:center; font-size:13px; font-weight:600; color:var(--sub); margin-bottom:10px; letter-spacing:.4px; text-transform:uppercase; }
+  .screen { background:var(--card); border-radius:28px; box-shadow:0 12px 30px rgba(21,32,28,.12); overflow:hidden;
+    height:620px; display:flex; flex-direction:column; border:1px solid var(--line); }
+  .statusbar { height:26px; display:flex; align-items:center; justify-content:center; }
+  .statusbar span { width:70px; height:5px; border-radius:3px; background:#d8dedb; }
+  .body { flex:1; overflow:hidden; padding:10px 16px 12px; display:flex; flex-direction:column; gap:12px; }
+
+  /* header */
+  .hd { display:flex; justify-content:space-between; align-items:center; }
+  .hd .t { font-size:17px; font-weight:700; }
+  .hd .s { font-size:11px; color:var(--sub); }
+  .avatar { width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+
+  /* cards */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px 14px; }
+  .card.solid { background:linear-gradient(135deg,#0f9d75,#0b7d5e); color:#fff; border:none; }
+  .kpis { display:flex; gap:8px; }
+  .kpi { flex:1; }
+  .kpi .k { font-size:10px; opacity:.85; }
+  .kpi .v { font-size:15px; font-weight:700; margin-top:2px; }
+  .netbar { margin-top:10px; height:6px; border-radius:3px; background:rgba(255,255,255,.25); overflow:hidden; }
+  .netbar i { display:block; height:100%; width:66%; background:#fff; border-radius:3px; }
+
+  .sec { font-size:12px; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:.5px; }
+
+  /* transaction rows */
+  .tx { display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); }
+  .tx:last-child { border-bottom:none; }
+  .dot { width:34px; height:34px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:#fff; flex:none; }
+  .tx .m { flex:1; min-width:0; }
+  .tx .m .n { font-size:13px; font-weight:600; }
+  .tx .m .w { font-size:11px; color:var(--sub); }
+  .amt { font-size:13px; font-weight:700; white-space:nowrap; }
+  .amt.minus { color:var(--red); } .amt.plus { color:var(--accent); }
+
+  /* tab bar */
+  .tabs { border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-around; padding:8px 6px 12px; }
+  .tab { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:9px; color:var(--sub); }
+  .tab svg { width:20px; height:20px; stroke:var(--sub); }
+  .tab.on, .tab.on svg { color:var(--accent); stroke:var(--accent); }
+  .fab { width:44px; height:44px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 14px rgba(15,157,117,.4); margin-top:-24px; }
+  .fab svg { width:20px; height:20px; stroke:#fff; }
+
+  /* add transaction */
+  .toggle { display:flex; background:#eef1f0; border-radius:12px; padding:3px; }
+  .toggle span { flex:1; text-align:center; font-size:13px; font-weight:600; padding:8px 0; border-radius:10px; color:var(--sub); }
+  .toggle .on { background:var(--red); color:#fff; }
+  .bigamt { text-align:center; padding:14px 0 6px; }
+  .bigamt .cur { font-size:13px; color:var(--sub); font-weight:600; }
+  .bigamt .num { font-size:40px; font-weight:800; letter-spacing:-1px; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .cat { border:1px solid var(--line); border-radius:12px; padding:8px 4px; text-align:center; font-size:10px; color:var(--sub); }
+  .cat i { display:block; width:12px; height:12px; border-radius:50%; margin:0 auto 5px; }
+  .cat.on { border-color:var(--accent); background:var(--accent-soft); color:var(--ink); font-weight:600; }
+  .field { display:flex; justify-content:space-between; align-items:center; border:1px solid var(--line);
+    border-radius:12px; padding:10px 12px; font-size:13px; }
+  .field .l { color:var(--sub); }
+  .btn { background:var(--accent); color:#fff; text-align:center; font-size:15px; font-weight:700;
+    border-radius:14px; padding:13px 0; margin-top:auto; }
+
+  /* history */
+  .search { display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:12px; padding:9px 12px; color:var(--sub); font-size:13px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { font-size:11px; padding:5px 10px; border-radius:20px; border:1px solid var(--line); color:var(--sub); }
+  .chip.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .dayh { display:flex; justify-content:space-between; font-size:11px; color:var(--sub); font-weight:600; padding-top:2px; }
+
+  /* reports */
+  .seg { display:flex; background:#eef1f0; border-radius:10px; padding:3px; font-size:11px; }
+  .seg span { flex:1; text-align:center; padding:6px 0; border-radius:8px; color:var(--sub); font-weight:600; }
+  .seg .on { background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .bars { display:flex; align-items:flex-end; gap:10px; height:110px; padding-top:6px; }
+  .bg { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; justify-content:flex-end; }
+  .bg .pair { display:flex; gap:3px; align-items:flex-end; height:100%; }
+  .bg .pair i { width:9px; border-radius:3px 3px 0 0; display:block; }
+  .bg .pair .in { background:var(--accent); }
+  .bg .pair .ex { background:#f3b8b8; }
+  .bg b { font-size:9px; color:var(--sub); font-weight:600; }
+  .donutwrap { display:flex; align-items:center; gap:14px; }
+  .donut { width:92px; height:92px; border-radius:50%; flex:none;
+    background:conic-gradient(var(--accent) 0 32%, var(--blue) 32% 54%, var(--amber) 54% 71%, var(--purple) 71% 85%, #cfd8d4 85% 100%);
+    display:flex; align-items:center; justify-content:center; }
+  .donut i { width:56px; height:56px; background:var(--card); border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; font-style:normal; }
+  .donut i b { font-size:12px; } .donut i span { font-size:8px; color:var(--sub); }
+  .legend { flex:1; display:flex; flex-direction:column; gap:5px; font-size:11px; }
+  .legend div { display:flex; align-items:center; gap:6px; }
+  .legend i { width:9px; height:9px; border-radius:3px; flex:none; }
+  .legend b { margin-left:auto; font-weight:700; }
+  .mrow { display:flex; align-items:center; gap:8px; font-size:11px; padding:4px 0; }
+  .mrow .avatar { width:24px; height:24px; font-size:10px; flex:none; }
+  .mrow .track { flex:1; height:7px; border-radius:4px; background:#eef1f0; overflow:hidden; }
+  .mrow .track i { display:block; height:100%; border-radius:4px; background:var(--accent); }
+  .mrow b { width:58px; text-align:right; font-weight:700; }
+
+  /* family */
+  .invite { background:var(--accent-soft); border:1px dashed var(--accent); border-radius:14px; padding:12px; text-align:center; }
+  .invite .c { font-size:18px; font-weight:800; letter-spacing:3px; color:var(--accent); }
+  .invite .t { font-size:10px; color:var(--sub); margin-top:2px; }
+  .mem { display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid var(--line); }
+  .mem:last-child { border-bottom:none; }
+  .mem .m { flex:1; }
+  .mem .m .n { font-size:13px; font-weight:600; }
+  .mem .m .w { font-size:11px; color:var(--sub); }
+  .role { font-size:10px; font-weight:700; padding:4px 9px; border-radius:20px; }
+  .role.admin { background:var(--accent-soft); color:var(--accent); }
+  .role.member { background:#eef1f0; color:var(--sub); }
+</style>
+
+<h1>Family Finance App — UI Mockups</h1>
+<div class="subtitle">Five main screens · SAR currency · Samboza family sample data</div>
+
+<div class="row">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="phone">
+    <div class="label">1 · Dashboard</div>
+    <div class="screen">
+      <div class="statusbar"><span></span></div>
+      <div class="body">
+        <div class="hd">
+          <div><div class="t">September 2026</div><div class="s">Samboza Family</div></div>
+          <div class="avatar">A</div>
+        </div>
+        <div class="card solid">
+          <div class="kpis">
+            <div class="kpi"><div class="k">Income</div><div class="v">SAR 24,500</div></div>
+            <div class="kpi"><div class="k">Expenses</div><div class="v">SAR 16,230</div></div>
+            <div class="kpi"><div class="k">Net</div><div class="v">+8,270</div></div>
+          </div>
+          <div class="netbar"><i></i></div>
+        </div>
+        <div class="sec">Recent transactions</div>
+        <div class="card" style="padding:4px 12px; flex:1; overflow:hidden;">
+          <div class="tx"><div class="dot" style="background:var(--accent)">SA</div><div class="m"><div class="n">Salary</div><div class="w">Ahmed · Today</div></div><div class="amt plus">+18,000</div></div>
+          <div class="tx"><div class="dot" style="background:var(--blue)">GR</div><div class="m"><div class="n">Groceries</div><div class="w">Sara · Today</div></div><div class="amt minus">−320</div></div>
+          <div class="tx"><div class="dot" style="background:var(--amber)">FU</div><div class="m"><div class="n">Fuel</div><div class="w">Omar · Yesterday</div></div><div class="amt minus">−180</div></div>
+          <div class="tx"><div class="dot" style="background:var(--purple)">ED</div><div class="m"><div class="n">School fees</div><div class="w">Ahmed · Aug 30</div></div><div class="amt minus">−2,500</div></div>
+          <div class="tx"><div class="dot" style="background:var(--teal)">DI</div><div class="m"><div class="n">Family dinner</div><div class="w">Sara · Aug 30</div></div><div class="amt minus">−410</div></div>
+        </div>
+        <div class="tabs">
+          <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg>Home</div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>History</div>
+          <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Reports</div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 15.5c2.5 0 5 1.5 5 4.5"/></svg>Family</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADD TRANSACTION ============ -->
+  <div class="phone">
+    <div class="label">2 · Add Transaction</div>
+    <div class="screen">
+      <div class="statusbar"><span></span></div>
+      <div class="body">
+        <div class="hd"><div class="t">New Transaction</div><div class="s">Cancel</div></div>
+        <div class="toggle"><span class="on">Expense</span><span>Income</span></div>
+        <div class="bigamt"><span class="cur">SAR</span><div class="num">245.50</div></div>
+        <div class="sec">Category</div>
+        <div class="grid">
+          <div class="cat on"><i style="background:var(--blue)"></i>Groceries</div>
+          <div class="cat"><i style="background:var(--amber)"></i>Transport</div>
+          <div class="cat"><i style="background:var(--teal)"></i>Dining</div>
+          <div class="cat"><i style="background:var(--red)"></i>Bills</div>
+          <div class="cat"><i style="background:var(--purple)"></i>Education</div>
+          <div class="cat"><i style="background:#5aa9e6"></i>Health</div>
+          <div class="cat"><i style="background:#c76b98"></i>Shopping</div>
+          <div class="cat"><i style="background:#8d99ae"></i>Other</div>
+        </div>
+        <div class="field"><span class="l">Date</span><span>Today, 1 Sep</span></div>
+        <div class="field"><span class="l">Note</span><span>Weekly groceries</span></div>
+        <div class="field"><span class="l">Receipt</span><span style="color:var(--accent);font-weight:600">Add photo</span></div>
+        <div class="btn">Save Expense</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ HISTORY ============ -->
+  <div class="phone">
+    <div class="label">3 · History</div>
+    <div class="screen">
+      <div class="statusbar"><span></span></div>
+      <div class="body">
+        <div class="hd"><div class="t">History</div><div class="avatar">A</div></div>
+        <div class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7a74" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          Search transactions
+        </div>
+        <div class="chips">
+          <span class="chip on">All members</span><span class="chip">Expenses</span><span class="chip">This month</span><span class="chip">Category</span>
+        </div>
+        <div style="flex:1; overflow:hidden;">
+          <div class="dayh"><span>Today</span><span>−500 · +18,000</span></div>
+          <div class="tx"><div class="dot" style="background:var(--accent)">SA</div><div class="m"><div class="n">Salary</div><div class="w">Ahmed · 09:12</div></div><div class="amt plus">+18,000</div></div>
+          <div class="tx"><div class="dot" style="background:var(--blue)">GR</div><div class="m"><div class="n">Groceries · Danube</div><div class="w">Sara · 17:40</div></div><div class="amt minus">−320</div></div>
+          <div class="tx"><div class="dot" style="background:var(--amber)">TR</div><div class="m"><div class="n">Taxi to school</div><div class="w">Lina · 07:35</div></div><div class="amt minus">−45</div></div>
+          <div class="dayh" style="margin-top:6px"><span>Yesterday</span><span>−590</span></div>
+          <div class="tx"><div class="dot" style="background:var(--amber)">FU</div><div class="m"><div class="n">Fuel</div><div class="w">Omar · 18:22</div></div><div class="amt minus">−180</div></div>
+          <div class="tx"><div class="dot" style="background:var(--teal)">DI</div><div class="m"><div class="n">Family dinner</div><div class="w">Sara · 20:15</div></div><div class="amt minus">−410</div></div>
+          <div class="dayh" style="margin-top:6px"><span>30 Aug</span><span>−2,910</span></div>
+          <div class="tx"><div class="dot" style="background:var(--purple)">ED</div><div class="m"><div class="n">School fees</div><div class="w">Ahmed · 11:05</div></div><div class="amt minus">−2,500</div></div>
+        </div>
+        <div class="tabs">
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg>Home</div>
+          <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>History</div>
+          <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Reports</div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 15.5c2.5 0 5 1.5 5 4.5"/></svg>Family</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REPORTS ============ -->
+  <div class="phone">
+    <div class="label">4 · Reports</div>
+    <div class="screen">
+      <div class="statusbar"><span></span></div>
+      <div class="body">
+        <div class="hd"><div class="t">Reports</div><div class="avatar">A</div></div>
+        <div class="seg"><span>Month</span><span class="on">6 Months</span><span>Year</span></div>
+        <div class="card">
+          <div class="sec" style="margin-bottom:6px">Income vs Expenses</div>
+          <div class="bars">
+            <div class="bg"><div class="pair"><i class="in" style="height:55%"></i><i class="ex" style="height:40%"></i></div><b>Apr</b></div>
+            <div class="bg"><div class="pair"><i class="in" style="height:60%"></i><i class="ex" style="height:52%"></i></div><b>May</b></div>
+            <div class="bg"><div class="pair"><i class="in" style="height:58%"></i><i class="ex" style="height:45%"></i></div><b>Jun</b></div>
+            <div class="bg"><div class="pair"><i class="in" style="height:72%"></i><i class="ex" style="height:65%"></i></div><b>Jul</b></div>
+            <div class="bg"><div class="pair"><i class="in" style="height:65%"></i><i class="ex" style="height:48%"></i></div><b>Aug</b></div>
+            <div class="bg"><div class="pair"><i class="in" style="height:80%"></i><i class="ex" style="height:53%"></i></div><b>Sep</b></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sec" style="margin-bottom:8px">Spending by category</div>
+          <div class="donutwrap">
+            <div class="donut"><i><b>16,230</b><span>SAR · Sep</span></i></div>
+            <div class="legend">
+              <div><i style="background:var(--accent)"></i>Groceries<b>32%</b></div>
+              <div><i style="background:var(--blue)"></i>Education<b>22%</b></div>
+              <div><i style="background:var(--amber)"></i>Bills<b>17%</b></div>
+              <div><i style="background:var(--purple)"></i>Dining<b>14%</b></div>
+              <div><i style="background:#cfd8d4"></i>Other<b>15%</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sec" style="margin-bottom:4px">Spending by member</div>
+          <div class="mrow"><div class="avatar" style="background:var(--accent)">A</div><div class="track"><i style="width:85%"></i></div><b>7,900</b></div>
+          <div class="mrow"><div class="avatar" style="background:var(--blue)">S</div><div class="track"><i style="width:60%"></i></div><b>5,480</b></div>
+          <div class="mrow"><div class="avatar" style="background:var(--amber)">O</div><div class="track"><i style="width:25%"></i></div><b>2,110</b></div>
+          <div class="mrow"><div class="avatar" style="background:var(--purple)">L</div><div class="track"><i style="width:9%"></i></div><b>740</b></div>
+        </div>
+        <div class="tabs">
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg>Home</div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>History</div>
+          <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+          <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Reports</div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 15.5c2.5 0 5 1.5 5 4.5"/></svg>Family</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FAMILY ============ -->
+  <div class="phone">
+    <div class="label">5 · Family</div>
+    <div class="screen">
+      <div class="statusbar"><span></span></div>
+      <div class="body">
+        <div class="hd"><div class="t">Samboza Family</div><div class="s">4 members</div></div>
+        <div class="invite">
+          <div class="c">SMBZ-2026</div>
+          <div class="t">Share this code to invite a family member</div>
+        </div>
+        <div class="sec">Members</div>
+        <div class="card" style="padding:4px 12px">
+          <div class="mem"><div class="avatar" style="background:var(--accent)">A</div><div class="m"><div class="n">Ahmed</div><div class="w">Joined Jan 2026</div></div><span class="role admin">ADMIN</span></div>
+          <div class="mem"><div class="avatar" style="background:var(--blue)">S</div><div class="m"><div class="n">Sara</div><div class="w">Joined Jan 2026</div></div><span class="role admin">ADMIN</span></div>
+          <div class="mem"><div class="avatar" style="background:var(--amber)">O</div><div class="m"><div class="n">Omar</div><div class="w">Joined Feb 2026</div></div><span class="role member">MEMBER</span></div>
+          <div class="mem"><div class="avatar" style="background:var(--purple)">L</div><div class="m"><div class="n">Lina</div><div class="w">Joined Mar 2026</div></div><span class="role member">MEMBER</span></div>
+        </div>
+        <div class="sec">This month</div>
+        <div class="card">
+          <div class="mrow"><div class="avatar" style="background:var(--accent)">A</div><div class="track"><i style="width:85%"></i></div><b>7,900</b></div>
+          <div class="mrow"><div class="avatar" style="background:var(--blue)">S</div><div class="track"><i style="width:60%"></i></div><b>5,480</b></div>
+          <div class="mrow"><div class="avatar" style="background:var(--amber)">O</div><div class="track"><i style="width:25%"></i></div><b>2,110</b></div>
+          <div class="mrow"><div class="avatar" style="background:var(--purple)">L</div><div class="track"><i style="width:9%"></i></div><b>740</b></div>
+        </div>
+        <div class="tabs">
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/></svg>Home</div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>History</div>
+          <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+          <div class="tab"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Reports</div>
+          <div class="tab on"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 15.5c2.5 0 5 1.5 5 4.5"/></svg>Family</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
