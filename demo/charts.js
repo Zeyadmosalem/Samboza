@@ -1,15 +1,31 @@
 /* Hand-rolled SVG charts — no libraries.
    Palette hexes are the validated categorical slots; income/expense green vs
    red sits in the CVD warn band, so it always ships with a legend, fixed
-   left/right position and signed values as the secondary channel. */
+   left/right position and signed values as the secondary channel.
+
+   Colours are read from the CSS tokens at draw time rather than hardcoded, so
+   the light and dark palettes are each their own validated set (all five dark
+   series clear 3:1 on the dark card; three of the light five do not, which is
+   why the legend and direct labels are not optional). A theme change just
+   re-runs redrawAll(). */
 window.Charts = (function () {
   'use strict';
 
   const NS = 'http://www.w3.org/2000/svg';
-  const C = {
-    income:'#1baf7a', expense:'#e34948', trend:'#2a78d6',
-    surface:'#ffffff', grid:'#e5eae8', ink:'#15201c', sub:'#6b7a74'
-  };
+
+  function theme() {
+    const cs = getComputedStyle(document.documentElement);
+    const v = n => cs.getPropertyValue(n).trim();
+    return {
+      income:  v('--income')  || '#1baf7a',
+      expense: v('--expense') || '#e34948',
+      trend:   v('--trend')   || '#2a78d6',
+      surface: v('--card')    || '#ffffff',
+      grid:    v('--line')    || '#e5eae8',
+      ink:     v('--ink')     || '#15201c',
+      sub:     v('--sub')     || '#6b7a74'
+    };
+  }
 
   const registry = [];          // redrawn on resize / language change
 
@@ -93,6 +109,7 @@ window.Charts = (function () {
   --------------------------------------------------------------------- */
   function columns(host, opts) {
     mount(host, function (host, W) {
+      const C = theme();
       const H = 260, padT = 18, padB = 28, padL = 58, padR = 8;
       const plotW = W - padL - padR, plotH = H - padT - padB;
       const svg = svgEl('svg', { width: W, height: H, class: 'viz-svg' }, host);
@@ -162,6 +179,7 @@ window.Charts = (function () {
   --------------------------------------------------------------------- */
   function donut(host, opts) {
     mount(host, function (host, W) {
+      const C = theme();
       const size = Math.min(W, 220), H = size;
       const svg = svgEl('svg', { width: W, height: H, class: 'viz-svg' }, host);
       const tip = tipFor(host);
@@ -205,6 +223,7 @@ window.Charts = (function () {
   --------------------------------------------------------------------- */
   function line(host, opts) {
     mount(host, function (host, W) {
+      const C = theme();
       const H = 230, padT = 18, padB = 28, padL = 58, padR = 14;
       const plotW = W - padL - padR, plotH = H - padT - padB;
       const svg = svgEl('svg', { width: W, height: H, class: 'viz-svg' }, host);
@@ -272,5 +291,5 @@ window.Charts = (function () {
     pending = setTimeout(redrawAll, 120);
   });
 
-  return { colors: C, columns: columns, donut: donut, line: line, redrawAll: redrawAll };
+  return { theme: theme, columns: columns, donut: donut, line: line, redrawAll: redrawAll };
 })();

@@ -22,7 +22,16 @@
   const pname = id => id ? t('p_' + id) : '';
   const cat = id => D.categories.find(c => c.id === id);
   const cname = id => t('c_' + id);
-  const ccolor = id => (cat(id) || {}).color || '#8a9490';
+
+  /* Dark is a selected palette, not an inversion: every person and category
+     carries its own dark step, picked for the dark surface. */
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+  function resolvedTheme() {
+    const set = document.documentElement.dataset.theme;
+    return (set === 'dark' || set === 'light') ? set : (prefersDark.matches ? 'dark' : 'light');
+  }
+  const hue = o => (o && (resolvedTheme() === 'dark' && o.dark ? o.dark : o.color)) || '#8a9490';
+  const ccolor = id => hue(cat(id));
   const money = (v, o) => I.money(v, o);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
   const short = v => v >= 1000 ? I.n(Math.round(v / 1000)) + 'k' : I.n(v);
@@ -65,13 +74,13 @@
   function donutSlices(map) {
     const majors = D.categories.filter(c => c.kind === 'expense' && c.major);
     const slices = majors
-      .map(c => ({ label: cname(c.id), value: map[c.id] || 0, color: c.color }))
+      .map(c => ({ label: cname(c.id), value: map[c.id] || 0, color: hue(c) }))
       .filter(s => s.value > 0)
       .sort((a, b) => b.value - a.value);
     const rest = Object.keys(map)
       .filter(k => !majors.some(c => c.id === k))
       .reduce((s, k) => s + map[k], 0);
-    if (rest > 0) slices.push({ label: t('c_other'), value: rest, color: '#8a9490' });
+    if (rest > 0) slices.push({ label: t('c_other'), value: rest, color: hue(cat('other')) });
     return slices;
   }
 
@@ -94,7 +103,9 @@
     reports:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     people:'<circle cx="9" cy="8" r="3.2"/><path d="M3 19c.8-3.2 3.2-4.8 6-4.8s5.2 1.6 6 4.8"/><path d="M16 5.5a3.2 3.2 0 0 1 0 6M17.5 14.6c2 .7 3.4 2.2 3.9 4.4"/>',
     settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
-    info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'
+    info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/>'
   };
   const icon = (k, cls) => '<svg class="' + (cls || 'ico') + '" viewBox="0 0 24 24">' + ICON[k] + '</svg>';
 
@@ -122,16 +133,21 @@
         '<p class="sub">' + esc(t('auth_sub')) + '</p>' +
         '<div class="who">' + users.map(u =>
           '<button data-action="signin" data-id="' + u.id + '">' +
-            '<span class="avatar lg" style="background:' + u.color + '">' + esc(u.initials) + '</span>' +
+            '<span class="avatar lg" style="background:' + hue(u) + '">' + esc(u.initials) + '</span>' +
             '<span><span class="n">' + esc(pname(u.id)) +
               (t('r_' + u.rel) === pname(u.id) ? '' : ' · ' + esc(t('r_' + u.rel))) + '</span><br>' +
             '<span class="w">' + esc(t('role_' + u.role)) + ' — ' + esc(t('role_' + u.role + '_note')) + '</span></span>' +
           '</button>').join('') +
         '</div>' +
         '<p class="hint">' + esc(t('auth_hint')) + ' · ' + esc(t('demo_note')) + '</p>' +
-        '<div style="margin-top:16px; display:flex; justify-content:center">' + langToggle() + '</div>' +
+        '<div class="controls">' + langToggle() + themeToggle() + '</div>' +
       '</div></div>';
   }
+
+  const themeToggle = () =>
+    '<button class="themetoggle" data-action="theme" aria-label="' + esc(t('theme_toggle')) +
+      '" title="' + esc(t('theme_toggle')) + '">' +
+      icon(resolvedTheme() === 'dark' ? 'sun' : 'moon', '') + '</button>';
 
   const langToggle = () =>
     '<div class="langtoggle">' +
@@ -162,10 +178,10 @@
         '<div class="main">' +
           '<header class="topbar">' +
             '<h1>' + esc(t('nav_' + state.screen)) + '</h1><div class="spacer"></div>' +
-            langToggle() +
+            langToggle() + themeToggle() +
             '<button class="userchip" data-action="signout" title="' + esc(t('switch_user')) + '">' +
               '<span><span class="n">' + esc(pname(u.id)) + '</span><br><span class="r">' + esc(t('role_' + u.role)) + '</span></span>' +
-              '<span class="avatar" style="background:' + u.color + '">' + esc(u.initials) + '</span>' +
+              '<span class="avatar" style="background:' + hue(u) + '">' + esc(u.initials) + '</span>' +
             '</button>' +
           '</header>' +
           '<div class="page" id="page"></div>' +
@@ -349,7 +365,7 @@
           '<div style="margin-top:16px" class="field"><label>' + esc(t('category')) + '</label>' +
             '<div class="catgrid">' + cats.map(c =>
               '<button class="catbtn ' + (state.addCat === c.id ? 'on' : '') + '" data-action="cat" data-c="' + c.id + '">' +
-                '<i style="background:' + c.color + '"></i>' + esc(cname(c.id)) + '</button>').join('') + '</div></div>' +
+                '<i style="background:' + hue(c) + '"></i>' + esc(cname(c.id)) + '</button>').join('') + '</div></div>' +
           '<div class="grid k2" style="margin-top:14px">' +
             '<div class="field"><label>' + esc(t('date')) + '</label>' +
               '<input id="fDate" class="input" type="date" value="2026-09-01" max="2026-09-01"></div>' +
@@ -469,7 +485,7 @@
             const s = logs ? memberSummary(p.id) : null;
             const done = paidThis(p.id);
             return '<tr><td><span style="display:inline-flex;align-items:center;gap:8px">' +
-                '<span class="avatar sm" style="background:' + p.color + '">' + esc(p.initials) + '</span>' + esc(pname(p.id)) + '</span></td>' +
+                '<span class="avatar sm" style="background:' + hue(p) + '">' + esc(p.initials) + '</span>' + esc(pname(p.id)) + '</span></td>' +
               '<td><span class="pill">' + esc(t('r_' + p.rel)) + '</span> ' +
                 '<span class="pill">' + esc(logs ? t('logs_spending') : t('receives_only')) + '</span></td>' +
               '<td class="num">' + money(p.allowance) + '</td>' +
@@ -694,7 +710,7 @@
       });
       const rows = Object.keys(byPerson).map(k => ({
         k, label: k === '_household' ? t('household') : pname(k),
-        value: byPerson[k], color: k === '_household' ? '#8a9490' : (person(k) || {}).color || '#8a9490'
+        value: byPerson[k], color: k === '_household' ? hue(cat('other')) : hue(person(k))
       })).sort((a, b) => b.value - a.value);
       const peak = rows[0].value;
 
@@ -705,8 +721,8 @@
           '<div class="card"><div class="cardhead"><div><h2>' + esc(t('rep_inc_exp')) + '</h2>' +
             '<div class="sub">' + esc(t('rep_inc_exp_sub')) + '</div></div><div class="spacer"></div>' + tableToggle('inc') + '</div>' +
             '<div class="chartlegend" style="margin-bottom:8px">' +
-              '<span><i style="background:' + Ch.colors.income + '"></i>' + esc(t('income')) + '</span>' +
-              '<span><i style="background:' + Ch.colors.expense + '"></i>' + esc(t('expense')) + '</span></div>' +
+              '<span><i style="background:' + Ch.theme().income + '"></i>' + esc(t('income')) + '</span>' +
+              '<span><i style="background:' + Ch.theme().expense + '"></i>' + esc(t('expense')) + '</span></div>' +
             '<div id="cIncExp"></div>' +
             tableBox('inc', '<table><thead><tr><th>' + esc(t('period')) + '</th><th class="num">' + esc(t('income')) +
               '</th><th class="num">' + esc(t('expense')) + '</th><th class="num">' + esc(t('net_period')) + '</th></tr></thead><tbody>' +
@@ -763,7 +779,7 @@
             '<th>' + esc(t('can_sign_in')) + '</th><th class="num">' + esc(t('gets_allowance')) + '</th></tr></thead><tbody>' +
             D.people.map(p => '<tr>' +
               '<td><span style="display:inline-flex;align-items:center;gap:8px">' +
-                '<span class="avatar sm" style="background:' + p.color + '">' + esc(p.initials) + '</span>' + esc(pname(p.id)) + '</span></td>' +
+                '<span class="avatar sm" style="background:' + hue(p) + '">' + esc(p.initials) + '</span>' + esc(pname(p.id)) + '</span></td>' +
               '<td>' + esc(t('r_' + p.rel)) + '</td>' +
               '<td>' + (p.role ? '<span class="pill ' + p.role + '">' + esc(t('role_' + p.role)) + '</span>' :
                 '<span class="pill">' + esc(t('beneficiary')) + '</span>') + '</td>' +
@@ -796,7 +812,7 @@
             '<div class="sub">' + esc(t('set_cats_sub')) + '</div></div></div>' +
             '<div class="chips">' + D.categories.filter(c => c.kind === 'expense').map(c =>
               '<span class="chip"><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:' +
-              c.color + ';margin-inline-end:6px"></i>' + esc(cname(c.id)) + '</span>').join('') + '</div></div>' +
+              hue(c) + ';margin-inline-end:6px"></i>' + esc(cname(c.id)) + '</span>').join('') + '</div></div>' +
           '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('set_fx')) + '</h2>' +
             '<div class="sub">' + esc(t('set_fx_sub')) + '</div></div></div>' +
             '<div class="calcrow"><span class="l">1 SAR</span><b>' + I.n(D.RATES.SAR * 100) / 100 + ' ' + esc(t('egp')) + '</b></div>' +
@@ -813,6 +829,12 @@
   const parseDate = v => { const p = String(v).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
 
   const ACTIONS = {
+    theme: function () {
+      const next = resolvedTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('samboza-theme', next); } catch (e) { /* private mode */ }
+      render();
+    },
     lang: function (el) {
       I.set(el.dataset.l);
       document.documentElement.lang = I.lang;
@@ -914,9 +936,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'toast';
-      el.style.cssText = 'position:fixed;inset-block-end:26px;inset-inline-start:50%;transform:translateX(-50%);' +
-        'background:#15201c;color:#fff;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:650;' +
-        'z-index:99;box-shadow:0 12px 34px rgba(21,32,28,.3)';
+      el.className = 'toast';
       document.body.appendChild(el);
     }
     el.textContent = msg;
@@ -933,5 +953,11 @@
   });
 
   function render() { state.user ? renderShell() : renderAuth(); }
+
+  // Follow the OS only while the viewer has made no explicit choice.
+  prefersDark.addEventListener('change', function () {
+    if (!document.documentElement.dataset.theme) render();
+  });
+
   render();
 })();

@@ -107,7 +107,7 @@ window.I18N = (function () {
     /* settings */
     set_title:'Settings', set_cats:'Categories', set_cats_sub:'Abdo can add to the default set.',
     set_fx:'Exchange rates', set_fx_sub:'Entered per remittance and stored with the record.',
-    set_lang:'Language', set_export:'Export', set_export_sub:'CSV and Excel land in Phase 2.',
+    set_lang:'Language', theme_toggle:'Switch between light and dark', set_export:'Export', set_export_sub:'CSV and Excel land in Phase 2.',
     set_open:'Open questions for this meeting',
     set_open_sub:'The demo picked a default for each of these. They are the decisions worth settling today.',
 
@@ -230,7 +230,7 @@ window.I18N = (function () {
 
     set_title:'الإعدادات', set_cats:'التصنيفات', set_cats_sub:'عبده يقدر يضيف على المجموعة الافتراضية.',
     set_fx:'أسعار الصرف', set_fx_sub:'تُدخل مع كل حوالة وتُحفظ مع السجل.',
-    set_lang:'اللغة', set_export:'التصدير', set_export_sub:'CSV و Excel في المرحلة الثانية.',
+    set_lang:'اللغة', theme_toggle:'تبديل بين الفاتح والداكن', set_export:'التصدير', set_export_sub:'CSV و Excel في المرحلة الثانية.',
     set_open:'أسئلة مفتوحة للاجتماع',
     set_open_sub:'العرض التجريبي اختار إجابة افتراضية لكل سؤال. دي القرارات اللي تستاهل نحسمها النهاردة.',
 

@@ -6,34 +6,35 @@ window.DEMO = (function () {
   const TODAY = new Date(2026, 8, 1);          // 1 Sep 2026
   const RATES = { EGP: 1, SAR: 12.95, USD: 48.60 };
 
-  /* ---- people (§2). isUser decides who can sign in. ------------------ */
+  /* ---- people (§2). isUser decides who can sign in.
+     `dark` is the same hue re-stepped for the dark surface, not a tint. --- */
   const people = [
-    { id:'mother',  rel:'mother',      role:'viewer', isUser:true,  initials:'M',  color:'#4a3aa7', allowance:0 },
-    { id:'abdo',    rel:'brother',     role:'admin',  isUser:true,  initials:'A',  color:'#0f9d75', allowance:0 },
-    { id:'zeyad',   rel:'son',         role:'member', isUser:true,  initials:'Z',  color:'#2a78d6', allowance:3000 },
-    { id:'rewan',   rel:'daughter',    role:'member', isUser:true,  initials:'R',  color:'#e87ba4', allowance:3000 },
-    { id:'mona',    rel:'aunt',        role:null,     isUser:false, initials:'Mo', color:'#eb6834', allowance:1500 },
-    { id:'grandma', rel:'grandmother', role:null,     isUser:false, initials:'G',  color:'#eda100', allowance:2000 },
-    { id:'marwa',   rel:'aunt',        role:null,     isUser:false, initials:'Ma', color:'#1baf7a', allowance:1500 },
-    { id:'uncle',   rel:'uncle',       role:null,     isUser:false, initials:'U',  color:'#e34948', allowance:0 }
+    { id:'mother',  rel:'mother',      role:'viewer', isUser:true,  initials:'M',  color:'#4a3aa7', dark:'#6a5bd0', allowance:0 },
+    { id:'abdo',    rel:'brother',     role:'admin',  isUser:true,  initials:'A',  color:'#0f9d75', dark:'#14a87e', allowance:0 },
+    { id:'zeyad',   rel:'son',         role:'member', isUser:true,  initials:'Z',  color:'#2a78d6', dark:'#3987e5', allowance:3000 },
+    { id:'rewan',   rel:'daughter',    role:'member', isUser:true,  initials:'R',  color:'#e87ba4', dark:'#d55181', allowance:3000 },
+    { id:'mona',    rel:'aunt',        role:null,     isUser:false, initials:'Mo', color:'#eb6834', dark:'#d95926', allowance:1500 },
+    { id:'grandma', rel:'grandmother', role:null,     isUser:false, initials:'G',  color:'#eda100', dark:'#c98500', allowance:2000 },
+    { id:'marwa',   rel:'aunt',        role:null,     isUser:false, initials:'Ma', color:'#1baf7a', dark:'#199e70', allowance:1500 },
+    { id:'uncle',   rel:'uncle',       role:null,     isUser:false, initials:'U',  color:'#e34948', dark:'#e66767', allowance:0 }
   ];
 
   /* ---- categories (§3.2). Colour is fixed per category, never by rank.
      The five largest carry validated categorical slots 1–5; the rest are
      neutral and fold into a single "Other" slice in the donut. --------- */
   const categories = [
-    { id:'allowance',  kind:'expense', color:'#2a78d6', major:true },
-    { id:'rent',       kind:'expense', color:'#eb6834', major:true },
-    { id:'food',       kind:'expense', color:'#1baf7a', major:true },
-    { id:'education',  kind:'expense', color:'#eda100', major:true },
-    { id:'medical',    kind:'expense', color:'#e87ba4', major:true },
-    { id:'gifts',      kind:'expense', color:'#8a9490', occasional:true },
-    { id:'car',        kind:'expense', color:'#8a9490' },
-    { id:'loanrepay',  kind:'expense', color:'#8a9490' },
-    { id:'other',      kind:'expense', color:'#8a9490' },
-    { id:'remittance', kind:'income',  color:'#1baf7a' },
-    { id:'carprofit',  kind:'income',  color:'#2a78d6' },
-    { id:'loanin',     kind:'income',  color:'#eda100' }
+    { id:'allowance',  kind:'expense', color:'#2a78d6', dark:'#3987e5', major:true },
+    { id:'rent',       kind:'expense', color:'#eb6834', dark:'#d95926', major:true },
+    { id:'food',       kind:'expense', color:'#1baf7a', dark:'#199e70', major:true },
+    { id:'education',  kind:'expense', color:'#eda100', dark:'#c98500', major:true },
+    { id:'medical',    kind:'expense', color:'#e87ba4', dark:'#d55181', major:true },
+    { id:'gifts',      kind:'expense', color:'#8a9490', dark:'#9aa4a0', occasional:true },
+    { id:'car',        kind:'expense', color:'#8a9490', dark:'#9aa4a0' },
+    { id:'loanrepay',  kind:'expense', color:'#8a9490', dark:'#9aa4a0' },
+    { id:'other',      kind:'expense', color:'#8a9490', dark:'#9aa4a0' },
+    { id:'remittance', kind:'income',  color:'#1baf7a', dark:'#199e70' },
+    { id:'carprofit',  kind:'income',  color:'#2a78d6', dark:'#3987e5' },
+    { id:'loanin',     kind:'income',  color:'#eda100', dark:'#c98500' }
   ];
 
   let seq = 0;
