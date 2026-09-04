@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(58);
+select plan(59);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
