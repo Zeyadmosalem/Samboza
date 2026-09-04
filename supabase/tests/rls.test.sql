@@ -110,13 +110,13 @@ select throws_ok(
   $$insert into member_expenses (family_id, person_id, category_id, amount_egp, occurred_on, status)
     values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000003',
             'dddd0000-0000-4000-8000-000000000001', 100, current_date, 'approved')$$,
-  'Zeyad cannot file his own expense pre-approved');
+  '42501', null, 'Zeyad cannot file his own expense pre-approved');
 
 select throws_ok(
   $$insert into member_expenses (family_id, person_id, category_id, amount_egp, occurred_on)
     values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000004',
             'dddd0000-0000-4000-8000-000000000001', 100, current_date)$$,
-  'Zeyad cannot file an expense in Rewan''s name');
+  '42501', null, 'Zeyad cannot file an expense in Rewan''s name');
 
 select lives_ok(
   $$insert into member_expenses (family_id, person_id, category_id, amount_egp, occurred_on)
@@ -154,7 +154,7 @@ select throws_ok(
     values ('aaaaaaaa-0000-4000-8000-000000000001', current_date - 1,
             'bbbb0000-0000-4000-8000-000000000005', 'settled',
             1000, 0, 0, 1000, 333, 500, 167)$$,
-  'Joe cannot mark his own day settled');
+  '42501', null, 'Joe cannot mark his own day settled');
 
 select lives_ok(
   $$insert into car_days (family_id, drive_date, submitted_by,
@@ -184,7 +184,7 @@ select throws_ok(
                              fx_rate, amount_egp, received_on, rate_set_by)
     values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000002',
             100, 'SAR', 12.9, 1290, current_date, 'bbbb0000-0000-4000-8000-000000000002')$$,
-  'Ghada cannot record a remittance');
+  '42501', null, 'Ghada cannot record a remittance');
 
 select throws_ok(
   $$insert into allowances (family_id, recipient_id, period, amount_egp, paid_on,
@@ -192,7 +192,7 @@ select throws_ok(
     values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000003',
             date_trunc('month', current_date)::date, 100, current_date,
             'bbbb0000-0000-4000-8000-000000000002','eeee0000-0000-4000-8000-000000000001')$$,
-  'Ghada cannot pay an allowance');
+  '42501', null, 'Ghada cannot pay an allowance');
 
 select lives_ok(
   $$insert into personal_entries (family_id, person_id, direction, category,
@@ -216,7 +216,7 @@ select is(tests.rows_in('select 1 from personal_entries'), 0::bigint,
 select throws_ok(
   $$insert into entries (journal_id, account_id, amount)
     values ('eeee0000-0000-4000-8000-000000000001','cccc0000-0000-4000-8000-000000000001', 1)$$,
-  'not even Abdo writes to the ledger directly — post_journal() only');
+  '42501', null, 'not even Abdo writes to the ledger directly — post_journal() only');
 
 -- =====================================================================
 -- Cross-tenant. The whole multi-family promise rests on these two.
