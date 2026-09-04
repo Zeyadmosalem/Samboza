@@ -109,10 +109,21 @@ create constraint trigger entries_must_balance
 -- A mistake is corrected by a REVERSING journal, never by an edit. This is
 -- what makes Ghada's auditor role real rather than decorative — she can see
 -- that nothing was quietly changed behind her.
-create rule journals_no_update as on update to journals do instead nothing;
-create rule journals_no_delete as on delete to journals do instead nothing;
-create rule entries_no_update  as on update to entries  do instead nothing;
-create rule entries_no_delete  as on delete to entries  do instead nothing;
+-- Enforced by PRIVILEGE, not by a DO INSTEAD NOTHING rule.
+--
+-- A rule would also swallow the cascade from `families on delete cascade`:
+-- deleting a family would rewrite the child DELETE into nothing, and the
+-- delete would either fail on the foreign key or leave orphaned journals
+-- behind an operation that looked like it worked. Rules rewrite statements
+-- indiscriminately; they cannot tell an application edit from a cascade.
+--
+-- Revoking the privilege refuses the write outright, and RLS denies it a
+-- second time: neither table has an UPDATE or DELETE policy, and with RLS
+-- enabled an operation with no matching policy is denied. Migrations and
+-- SECURITY DEFINER functions run as the table owner, which bypasses RLS, so
+-- post_journal() and reverse_journal() still work.
+revoke update, delete on journals from authenticated, anon;
+revoke update, delete on entries  from authenticated, anon;
 
 -- ---------------------------------------------------------------- balances
 -- Derived, never a stored column that can drift from its own entries.

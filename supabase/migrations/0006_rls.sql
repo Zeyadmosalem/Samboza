@@ -63,7 +63,12 @@ create policy entries_read on entries for select
   ));
 
 -- Nothing is written to the ledger directly. post_journal() is the only door,
--- so "balanced" and "authorised" are decided in exactly one place.
+-- so "balanced" and "authorised" are decided in exactly one place. It is
+-- SECURITY DEFINER and runs as the table owner, which bypasses RLS, so this
+-- policy blocks the application without blocking the function.
+--
+-- UPDATE and DELETE need no policy: with RLS on, an operation with no
+-- matching policy is already denied. 0002 revokes the privilege as well.
 create policy journals_no_direct_write on journals for insert with check (false);
 create policy entries_no_direct_write  on entries  for insert with check (false);
 
