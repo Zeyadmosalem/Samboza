@@ -74,16 +74,21 @@ next three months are pleasant.
 Write it as migration files from the first line, never by clicking in the
 Supabase dashboard. The dashboard is for looking, not for changing.
 
-Resolve these before the first migration, because retrofitting them is painful:
+**The full design is written: [Database-Design.md](Database-Design.md)** — every
+table, constraint, trigger and RLS policy, in migration order. Build it exactly
+as written before any application code exists.
 
-| Decision | Do this |
+The six decisions baked into that design, because retrofitting any of them is
+painful:
+
+| Decision | Why |
 |---|---|
-| **Double-entry** | `accounts` + `entries`, not `transactions(type, amount)`. Receivables ("Joe owes 347"), loans, cash-vs-bank and Phase 3 wallets are then all one mechanism. Retrofitting later means migrating live family money. |
-| **Append-only** | Never `UPDATE` or `DELETE` a posted row. A correction is a reversing entry. This is what makes Ghada's auditor role real rather than decorative. |
-| **Money** | `bigint` piastres, or `numeric(12,2)`. Never float. Write down that Marwa absorbs the odd piastre. |
-| **Dates** | `date` for "which day he drove". `timestamptz` for "when it was recorded". They are different questions. |
-| **Uniqueness** | `UNIQUE(family_id, drive_date)` on car days. `UNIQUE(recipient_id, period)` on allowances. Both are currently missing and both let money be counted twice. |
-| **Rates by date** | Allowance rate = `ORDER BY effective_from DESC LIMIT 1`, never row order. |
+| **Double-entry** (`accounts` + `entries`) | "Joe is holding 1,725", the loan balance, cash-vs-bank and Phase 3 wallets are one missing concept — an account. Retrofitting means migrating live family money. |
+| **Append-only** | A posted journal is never edited or deleted; a correction is a reversing journal. This is what makes Ghada's auditor role real rather than decorative. |
+| **Money as `bigint` piastres** | Never float. Marwa absorbs the odd piastre, and a `check` constraint enforces that the parts sum to the net. |
+| **`date` vs `timestamptz`** | "Which day he drove" and "when it was recorded" are different questions. |
+| **Uniqueness in the database** | `(family_id, drive_date)`, `(recipient_id, period)`, `client_uuid`. Each blocked a way money was being counted twice. |
+| **Rates by date** | `ORDER BY effective_from DESC LIMIT 1`, never row order. |
 
 ### Days 4–5 — RLS, written and tested
 
@@ -138,13 +143,18 @@ each sees their own navigation, and nobody can reach anyone else's screens.
 Build in this order. Each step is demoable to the family on its own.
 
 1. **Ledger + History** — record income and expense, see them listed, filter by
-   person and source. Everything else is a special case of this.
+   person and source. Abdo's History shows all three stores in one feed — the
+   family ledger, member submissions and car days — sliceable by person.
+   Everything else is a special case of this.
 2. **Allowances** — effective-dated rates, disbursement, per-person balances.
 3. **Member submissions + approvals** — pending until Abdo decides.
    *Ship the notification with it.* Without a nudge the queue silently rots and
    the members' balances are quietly wrong.
-4. **The car** — Joe's daily submission, worked days and days off, the
-   direct/indirect classification, the split, settlement.
+4. **The car** — Joe's daily submission, worked days *and recorded days off*,
+   the direct/indirect class he chooses himself, the split (which may be
+   negative), and **handovers**: Joe records days, Abdo confirms receipt when the
+   cash is actually in his hand, covering whatever span it covers. Until then the
+   money sits in `due_from_driver` and is not counted as cash.
 5. **Remittances** — multi-currency in, rate stored with the record.
 6. **Loans.**
 7. **Reports** — the four charts.
@@ -153,6 +163,58 @@ Build in this order. Each step is demoable to the family on its own.
 
 **Checkpoint after each:** the family uses it for a week on real numbers before
 you build the next one.
+
+---
+
+## The visual pass — glass (week 6, after the screens exist)
+
+Deliberately **after** the money works. A restyle applied to a half-finished
+screen set gets done twice.
+
+The look is Apple's frosted-glass idiom: translucent surfaces that pick up what
+is behind them, thin bright borders, deep soft shadows, generous rounding.
+
+**The technique.** A glass surface is four things together, and it fails if any
+one is missing:
+
+```css
+.glass {
+  background: rgba(255,255,255,.62);          /* translucent, not solid */
+  backdrop-filter: blur(24px) saturate(180%); /* what actually makes it glass */
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255,255,255,.7);     /* the bright top edge */
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  border-radius: 22px;
+}
+```
+
+Dark mode is **not** these values inverted: use `rgba(28,30,32,.66)` with a
+`rgba(255,255,255,.10)` border. Glass over a dark ground needs a dimmer fill and
+a much fainter edge, or it reads as plastic.
+
+**Five things that will bite:**
+
+1. **Glass needs something behind it.** On a flat background it is just a grey
+   box. Put a soft colour wash or gradient on the page ground first, then float
+   the panels over it. Skip this and the whole effect is wasted.
+2. **`backdrop-filter` is expensive.** Every blurred surface is its own
+   compositor layer. Use it on chrome — sidebar, topbar, modals, hero cards —
+   and never on every row of a 500-row history. Frames will drop on a
+   mid-range Android.
+3. **Contrast still applies.** Text on a translucent surface must clear 4.5:1
+   against the *worst* thing that can pass behind it. Keep the token system and
+   re-run the contrast audit; do not eyeball it.
+4. **Firefox and older WebViews.** Ship an `@supports (backdrop-filter: blur(1px))`
+   guard with an opaque fallback, and never let the fallback be unreadable.
+5. **Keep the tokens.** The palette, the validated chart hues and the RTL logical
+   properties all survive. Glass changes surfaces and borders, not the colour
+   system.
+
+Apply to: sidebar, topbar, cards, sign-in panel, modals, the mobile tab bar.
+Leave table and list rows opaque — they are the dense parts.
+
+**Checkpoint:** contrast audit green in both themes and both languages, and
+History scrolling at 60fps on a real phone.
 
 ---
 
@@ -206,9 +268,19 @@ Steps 1 and 2 have a closing window. Everything else can be reordered.
 
 ## Still open
 
-- **A day where car costs exceed takings.** The demo now records the shortfall
-  rather than flooring it silently, but nobody has decided *who absorbs it* —
-  the family, or Joe's next day. Needs an answer before the car module ships.
-- **Does Joe hand over cash daily, or does it accumulate?** If it accumulates,
-  settlement must split into "I agree with the numbers" and "I have the money",
-  and cash on hand must stop counting money still in his pocket.
+Both earlier questions are settled and built:
+
+- **A losing day goes negative**, shared in the same ratios as a profit — the
+  driver a third, the family three quarters of the rest, Marwa a quarter. Not
+  floored, because the ledger runs over time: a bad Tuesday nets off against a
+  good Wednesday.
+- **Handovers are irregular by design.** Joe hands over when it suits him; the
+  app records and tracks rather than assuming a rhythm, and Abdo confirms
+  receipt.
+
+Still open:
+
+- **Handover variance.** If the computed share is 1,725 and Joe hands over
+  1,700, `counted_egp` captures the difference — but nobody has decided whether
+  it is written off or carried against his next handover.
+- **Grandma has no name** in the demo; she is still labelled by her role.

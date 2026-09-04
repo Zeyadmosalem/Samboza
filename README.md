@@ -20,6 +20,7 @@ production application yet.
 plan/    Family-Finance-App-Plan.md      the planning document — actors, money
                                          model, data model, phases, roadmap
          Implementation-Plan.md          build order, free hosting, maintenance
+         Database-Design.md              full schema, constraints, RLS policies
          Family-Finance-App-Mockups.html the original five phone screens
 
 demo/    index.html + 5 files            a clickable desktop demo of the app

@@ -57,6 +57,34 @@ window.DEMO = (function () {
     p.familyId = FAMILY.id;
   });
 
+  /* ---- credentials -----------------------------------------------------
+     DEMO ONLY, and deliberately obvious about it. Real credentials never
+     live beside the data: Supabase Auth holds the identity, the password is
+     Argon2 on their side, and `people.auth_user_id` is the only link back
+     to a person. Nothing here resembles how it ships — it exists so the
+     login screen has something to check against. ------------------------- */
+  const CREDENTIALS = {
+    'ghada@samboza.family':  { person:'mother', password:'demo1234' },
+    'abdo@samboza.family':   { person:'abdo',   password:'demo1234' },
+    'zeyad@samboza.family':  { person:'zeyad',  password:'demo1234' },
+    'rewan@samboza.family':  { person:'rewan',  password:'demo1234' },
+    'joe@samboza.family':    { person:'uncle',  password:'demo1234' }
+  };
+  people.forEach(function (p) {
+    const hit = Object.keys(CREDENTIALS).find(e => CREDENTIALS[e].person === p.id);
+    if (hit) p.email = hit;
+  });
+
+  /* Returns the person, or a reason. Never says WHICH half was wrong — that
+     tells an attacker whether an address exists. Same message either way. */
+  function authenticate(email, password) {
+    const rec = CREDENTIALS[String(email || '').trim().toLowerCase()];
+    if (!rec || rec.password !== password) return { error: 'bad_credentials' };
+    const p = people.find(x => x.id === rec.person);
+    if (!p || !p.isUser) return { error: 'no_access' };
+    return { person: p };
+  }
+
   /* ---- categories (§3.2). Colour is fixed per category, never by rank.
      The five largest carry validated categorical slots 1–5; the rest are
      neutral and fold into a single "Other" slice in the donut. --------- */
@@ -204,26 +232,24 @@ window.DEMO = (function () {
   const EXPENSE_LABELS = Object.keys(DEFAULT_KIND);
   const kindOf = e => e.kind || DEFAULT_KIND[e.label] || 'direct';
 
-  /* Amounts are whole piastres in the real schema; here they are whole EGP.
-     Never a float. The split is computed so the parts always sum exactly to
-     the net: Joe rounds, the family rounds, and Marwa takes the remainder —
-     she absorbs the odd piastre. That rule is a decision, so it is written
-     down rather than left to emerge from the arithmetic.
+  /* Amounts are whole piastres in the real schema; here whole EGP. Never a
+     float. The parts always sum exactly to the net: Joe rounds, the family
+     rounds, Marwa takes the remainder — she absorbs the odd piastre.
 
-     A day where costs exceed takings does NOT floor silently: `shortfall`
-     carries the amount the family is out of pocket, so the money is still
-     accounted for instead of vanishing. */
+     A day can be NEGATIVE. A big fine on a quiet day costs more than it
+     earned, and the same ratios apply to a loss as to a profit: Joe carries
+     a third of it, the family three quarters of the rest, Marwa a quarter.
+     Nobody is shielded. It is not floored at zero, because the ledger runs
+     over time — a bad Tuesday simply nets off against a good Wednesday. */
   function settleDay(gross, items) {
     const of = k => items.filter(e => kindOf(e) === k)
                          .reduce((s, e) => s + e.amount, 0);
     const direct = of('direct'), indirect = of('indirect');
-    const raw       = gross - direct - indirect;
-    const shortfall = raw < 0 ? -raw : 0;
-    const net       = Math.max(0, raw);
+    const net    = gross - direct - indirect;     // may be below zero
     const uncle  = Math.round(net / 3);
     const rest   = net - uncle;
     const family = Math.round(rest * 0.75);
-    return { direct, indirect, net, shortfall, uncle, rest, family, marwa: rest - family };
+    return { direct, indirect, net, uncle, rest, family, marwa: rest - family };
   }
 
   /* The car does not run every day. A day off is RECORDED, not merely
@@ -231,9 +257,8 @@ window.DEMO = (function () {
      identical, and the family cannot tell which. */
   function dayOff(date, by) {
     return { id: uid('cd'), date, gross: 0, expenses: [], worked: false,
-             direct: 0, indirect: 0, net: 0, shortfall: 0,
-             uncle: 0, rest: 0, family: 0, marwa: 0,
-             status: 'settled', submittedBy: by, settledBy: null };
+             direct: 0, indirect: 0, net: 0, uncle: 0, rest: 0, family: 0, marwa: 0,
+             status: 'off', submittedBy: by, handoverId: null };
   }
 
   /* One row per calendar day, at most (UNIQUE(family_id, drive_date)). */
@@ -254,18 +279,60 @@ window.DEMO = (function () {
       if (rand() < 0.12) items.push(exp('tolls',  20 + Math.round(rand() * 40)));
       if (day === 3)     items.push(exp('permit', 200));
       if (rand() < 0.05) items.push(exp('ticket', 150 + Math.round(rand() * 150)));
+      if (rand() < 0.02) items.push(exp('ticket', 700 + Math.round(rand() * 400)));  // a bad one
       if (rand() < 0.07) items.push(exp('admin',  80 + Math.round(rand() * 90)));
       if (rand() < 0.04) items.push(exp('other',  40 + Math.round(rand() * 90), 'n_carwash'));
-      const open = (m === 9);                                 // today is still open
       carDays.push(Object.assign({
         id: uid('cd'), date: d(m, day), gross, expenses: items, worked: true,
-        status: open ? 'open' : 'settled', submittedBy: 'uncle', settledBy: open ? null : 'abdo'
+        status: 'recorded', submittedBy: 'uncle', handoverId: null
       }, settleDay(gross, items)));
     }
   }
-  carDays.filter(c => c.status === 'settled' && c.worked).forEach(function (c) {
-    add({ type:'income', cat:'carprofit', amount:c.family, date:c.date, note:'n_car_share', src:c.id });
-  });
+  /* ---- handovers (§3.4) ------------------------------------------------
+     Joe hands cash over when it suits him — daily, every ten days, whenever.
+     The app does not guess. He RECORDS days; Abdo CONFIRMS a handover when
+     the money is actually in his hand, covering however many days it covers.
+
+     That separation is the whole point of a tracking system: until Abdo
+     confirms, the family's share is money Joe is holding, not money the
+     family has. It is outstanding, and the dashboard must not pretend
+     otherwise. Income posts on the handover date, not the drive date. ----- */
+  const handovers = [];
+
+  function confirmHandover(dayIds, date, by) {
+    const days = carDays.filter(c => dayIds.indexOf(c.id) >= 0 && c.status === 'recorded');
+    if (!days.length) return null;
+    const amount = days.reduce((s, c) => s + c.family, 0);
+    const h = {
+      id: uid('h'), date, amount, by,
+      days: days.map(c => c.id),
+      gross: days.reduce((s, c) => s + c.gross, 0),
+      joe:   days.reduce((s, c) => s + c.uncle, 0),
+      marwa: days.reduce((s, c) => s + c.marwa, 0)
+    };
+    days.forEach(function (c) { c.status = 'settled'; c.handoverId = h.id; });
+    handovers.push(h);
+    add({ type: amount >= 0 ? 'income' : 'expense', cat:'carprofit',
+          amount: Math.abs(amount), date, note:'n_car_handover', src:h.id });
+    return h;
+  }
+
+  // Seed: Joe handed over roughly every nine days. The most recent stretch is
+  // deliberately left outstanding, so the demo opens with money still owed.
+  (function seedHandovers() {
+    const worked = carDays.filter(c => c.worked).sort((a, b) => a.date - b.date);
+    const cutoff = new Date(2026, 7, 24);            // leave the last week open
+    let batch = [];
+    worked.forEach(function (c) {
+      if (c.date >= cutoff) return;
+      batch.push(c.id);
+      if (batch.length >= 9) {
+        confirmHandover(batch, new Date(c.date.getTime() + 864e5), 'abdo');
+        batch = [];
+      }
+    });
+    if (batch.length) confirmHandover(batch, cutoff, 'abdo');
+  })();
 
   /* ---- loans (§3.5) --------------------------------------------------- */
   const loans = [{
@@ -315,8 +382,10 @@ window.DEMO = (function () {
                     status:'pending', decidedBy:null });
   });
 
-  return { TODAY, RATES, FAMILY, people, categories, tx, remittances, carDays,
+  return { TODAY, RATES, FAMILY, CREDENTIALS, authenticate,
+           people, categories, tx, remittances, carDays,
            DEFAULT_KIND, EXPENSE_LABELS, kindOf, settleDay, dayOff, dayTaken,
+           handovers, confirmHandover,
            loans, allowances, allowanceRates, rateOn,
            memberTx, add, uid };
 })();

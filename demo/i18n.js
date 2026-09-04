@@ -151,6 +151,23 @@ window.I18N = (function () {
     err_dup_day:'That day is already recorded', already_settled:'Already settled',
     off:'Off', not_submitted:'Not submitted',
 
+    /* handovers */
+    handover_due:'Cash to hand over', confirm_handover:'Confirm I received it',
+    handover_amount:'Family share to receive', handover_saved:'Handover recorded',
+    owed_by_joe:'Held by Joe',
+    handover_note:'Joe hands over when it suits him — daily, every ten days, whenever. Until you confirm the cash is in your hand, this is money he is holding, not money the family has.',
+    handover_note_short:'not counted as cash until confirmed',
+    n_car_handover:'Car handover',
+
+    /* login */
+    login_title:'Sign in', login_sub:'Your own account. What you can see and do depends on who you are.',
+    email:'Email', password:'Password', forgot:'Forgotten your password?',
+    forgot_note:'Abdo can send you a reset link — he can never see or set your password.',
+    demo_accounts:'Demo accounts — tap one to fill the form',
+    demo_password:'Password for all of them:',
+    err_bad_credentials:'That email and password do not match',
+    err_no_access:'That account cannot sign in',
+
     /* settings */
     set_title:'Settings', set_cats:'Categories', set_cats_sub:'Abdo can add to the default set.',
     set_fx:'Exchange rates', set_fx_sub:'Entered per remittance and stored with the record.',
@@ -330,6 +347,23 @@ window.I18N = (function () {
     err_date:'اختر تاريخ صحيح', err_future:'اليوم ده لسه مجاش',
     err_dup_day:'اليوم ده متسجل بالفعل', already_settled:'تمت تسويته بالفعل',
     off:'راحة', not_submitted:'لم يُسجَّل',
+
+    /* handovers */
+    handover_due:'فلوس للتسليم', confirm_handover:'أؤكد إني استلمتها',
+    handover_amount:'نصيب العائلة المستحق', handover_saved:'تم تسجيل التسليم',
+    owed_by_joe:'مع يوسف',
+    handover_note:'يوسف بيسلّم لما يناسبه — كل يوم، كل عشر أيام، أي وقت. لحد ما تأكد إن الفلوس في إيدك، دي فلوس معاه مش فلوس عند العائلة.',
+    handover_note_short:'مش بتتحسب كاش غير بعد التأكيد',
+    n_car_handover:'تسليم السيارة',
+
+    /* login */
+    login_title:'تسجيل الدخول', login_sub:'حسابك أنت. اللي تشوفه وتعمله بيعتمد على مين انت.',
+    email:'البريد الإلكتروني', password:'كلمة المرور', forgot:'نسيت كلمة المرور؟',
+    forgot_note:'عبده يقدر يبعتلك رابط لإعادة التعيين — لكنه أبدًا مش بيشوف كلمة مرورك ولا بيحددها.',
+    demo_accounts:'حسابات تجريبية — اضغط واحد يملأ الفورم',
+    demo_password:'كلمة المرور لكلهم:',
+    err_bad_credentials:'البريد وكلمة المرور مش متطابقين',
+    err_no_access:'الحساب ده مش مسموح له بالدخول',
 
     /* settings */
     set_title:'الإعدادات', set_cats:'التصنيفات', set_cats_sub:'عبده يقدر يضيف على المجموعة الافتراضية.',

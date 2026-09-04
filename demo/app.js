@@ -14,7 +14,9 @@
     addCurrency: 'EGP',
     filters: { q: '', type: 'all', cat: 'all', person: 'all', src: 'all' },
     tables: {},
-    day: null            // Joe's in-progress day submission
+    day: null,           // Joe's in-progress day submission
+    loginEmail: '',
+    loginError: null
 
   };
 
@@ -134,6 +136,11 @@
   const allowed = s => ACCESS[s].indexOf(state.user.role) >= 0;
 
   /* ── auth ──────────────────────────────────────────────────────────── */
+  /* ------------------------------------------------------------------
+     Login. A real credential form, not a person picker — the screen the
+     family will actually meet. The demo accounts are listed underneath
+     because it is a demo; in production that block is simply absent.
+  ------------------------------------------------------------------ */
   function renderAuth() {
     const users = D.people.filter(p => p.isUser);
     root.innerHTML =
@@ -141,18 +148,41 @@
         '<div class="brandmark">S</div>' +
         '<div class="famline">' + esc(t('signing_into')) + ' <b>' + esc(t('family')) +
           '</b> <span class="mono">' + esc(D.FAMILY.code) + '</span></div>' +
-        '<h1>' + esc(t('auth_title')) + '</h1>' +
-        '<p class="sub">' + esc(t('auth_sub')) + '</p>' +
-        '<div class="who">' + users.map(u =>
-          '<button data-action="signin" data-id="' + u.id + '">' +
-            '<span class="avatar lg" style="background:' + hue(u) + '">' + esc(u.initials) + '</span>' +
-            '<span><span class="n">' + esc(pname(u.id)) + '</span><br>' +
-            '<span class="w">' + esc(t('role_' + u.role)) + ' — ' + esc(t('role_' + u.role + '_note')) + '</span></span>' +
-          '</button>').join('') +
+        '<h1>' + esc(t('login_title')) + '</h1>' +
+        '<p class="sub">' + esc(t('login_sub')) + '</p>' +
+
+        '<form class="loginform" id="loginForm" autocomplete="on">' +
+          '<div class="field"><label for="lEmail">' + esc(t('email')) + '</label>' +
+            '<input id="lEmail" class="input" type="email" autocomplete="username" ' +
+              'placeholder="you@samboza.family" value="' + esc(state.loginEmail || '') + '"></div>' +
+          '<div class="field" style="margin-top:12px"><label for="lPass">' + esc(t('password')) + '</label>' +
+            '<input id="lPass" class="input" type="password" autocomplete="current-password" ' +
+              'placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"></div>' +
+          '<div class="errmsg" id="lErr" style="margin-top:10px" ' +
+            (state.loginError ? '' : 'hidden') + '>' + esc(state.loginError ? t(state.loginError) : '') + '</div>' +
+          '<button class="btn" type="submit" style="width:100%;margin-top:18px">' +
+            esc(t('sign_in')) + '</button>' +
+          '<button class="linkbtn" type="button" data-action="forgot">' + esc(t('forgot')) + '</button>' +
+        '</form>' +
+
+        '<div class="demoaccounts"><div class="t">' + esc(t('demo_accounts')) + '</div>' +
+          '<div class="chips">' + users.map(u =>
+            '<button class="chip" data-action="fill" data-id="' + u.id + '">' +
+              '<i style="display:inline-block;width:8px;height:8px;border-radius:50%;' +
+              'margin-inline-end:6px;background:' + hue(u) + '"></i>' +
+              esc(pname(u.id)) + ' \u00b7 ' + esc(t('role_' + u.role)) + '</button>').join('') +
+          '</div>' +
+          '<div class="t" style="margin-top:8px">' + esc(t('demo_password')) + ' <span class="mono">demo1234</span></div>' +
         '</div>' +
-        '<p class="hint">' + esc(t('auth_hint')) + ' · ' + esc(t('demo_note')) + '</p>' +
+
+        '<p class="hint">' + esc(t('demo_note')) + '</p>' +
         '<div class="controls">' + langToggle() + themeToggle() + '</div>' +
       '</div></div>';
+
+    const form = document.getElementById('loginForm');
+    form.addEventListener('submit', function (e) { e.preventDefault(); ACTIONS.login(); });
+    const em = document.getElementById('lEmail');
+    if (state.loginEmail) document.getElementById('lPass').focus(); else em.focus();
   }
 
   const themeToggle = () =>
@@ -318,7 +348,7 @@
     const mine = D.carDays.filter(c => c.submittedBy === state.user.id).sort(byDateDesc);
     const settled = mine.filter(c => c.status === 'settled');
     const win = settled.filter(c => inWindow(c, 30));
-    const open = mine.filter(c => c.status === 'open');
+    const open = mine.filter(c => c.status === 'recorded');
     return '<div class="grid k4">' +
         '<div class="card hero kpi"><div class="k">' + esc(t('earned_month')) + '</div>' +
           '<div class="v">' + money(win.reduce((s, c) => s + c.uncle, 0)) + '</div>' +
@@ -339,8 +369,8 @@
             '<div class="rowline"><div class="m"><div class="n">' + esc(I.date(c.date, true)) + '</div>' +
               '<div class="w">' + esc(t('day_gross')) + ' ' + money(c.gross) + ' · ' +
                 esc(t('car_expenses')) + ' ' + money(c.direct + c.indirect) + '</div></div>' +
-              '<span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
-                esc(c.status === 'open' ? t('awaiting') : t('settled')) + '</span>' +
+              '<span class="pill ' + (c.status === 'recorded' ? 'warn' : 'ok') + '">' +
+                esc(c.status === 'recorded' ? t('awaiting') : t('settled')) + '</span>' +
               '<div class="amt plus">' + money(c.uncle) + '</div></div>').join('') + '</div></div>' +
         '<div class="card"><div class="cardhead"><div><h2>' + esc(t('car_title')) + '</h2>' +
           '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
@@ -638,7 +668,7 @@
   SCREENS.car = {
     html: function () {
       const days = D.carDays.slice().sort(byDateDesc);
-      const open = days.filter(c => c.status === 'open');
+      const open = days.filter(c => c.status === 'recorded');
       const settled = days.filter(c => c.status === 'settled');
       const win = settled.filter(c => inWindow(c, 30));
       const tot = k => win.reduce((a, c) => a + c[k], 0);
@@ -656,21 +686,33 @@
             '<div class="v">' + I.n(win.length) + '</div>' +
             '<div class="w">' + esc(t('total_direct')) + ' ' + money(tot('direct')) + ' · ' +
               esc(t('total_indirect')) + ' ' + money(tot('indirect')) + '</div></div>' +
-          '<div class="card kpi"><div class="k">' + esc(t('awaiting')) + '</div>' +
-            '<div class="v ' + (open.length ? 'minus' : '') + '">' + I.n(open.length) + '</div>' +
-            '<div class="w">' + esc(t('car_calc')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('owed_by_joe')) + '</div>' +
+            '<div class="v ' + (open.length ? 'minus' : '') + '">' +
+              money(open.reduce((a, c) => a + c.family, 0)) + '</div>' +
+            '<div class="w">' + esc(t('results_count', { n: I.n(open.length) })) + ' \u00b7 ' +
+              esc(t('handover_note_short')) + '</div></div>' +
         '</div>' +
 
         (open.length ? '<div class="grid split" style="margin-top:16px">' +
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('handover_due')) + '</h2>' +
+            '<div class="sub">' + esc(t('handover_note')) + '</div></div>' +
+            '<div class="spacer"></div><span class="pill warn">' +
+              esc(t('results_count', { n: I.n(open.length) })) + '</span></div>' +
+            '<div class="calcrow"><span class="l">' + esc(t('days_driven')) + '</span><b>' + I.n(open.length) + '</b></div>' +
+            '<div class="calcrow"><span class="l">' + esc(t('day_gross')) + '</span><b>' +
+              money(open.reduce((a, c) => a + c.gross, 0)) + '</b></div>' +
+            '<div class="calcrow out"><span class="l">' + esc(t('joe_share')) + '</span><b>' +
+              money(open.reduce((a, c) => a + c.uncle, 0)) + '</b></div>' +
+            '<div class="calcrow out"><span class="l">' + esc(t('marwa_share')) + '</span><b>' +
+              money(open.reduce((a, c) => a + c.marwa, 0)) + '</b></div>' +
+            '<div class="calcrow total in"><span class="l">' + esc(t('handover_amount')) + '</span><b>' +
+              money(open.reduce((a, c) => a + c.family, 0)) + '</b></div>' +
+            (can.write() ? '<button class="btn" style="width:100%;margin-top:14px" data-action="confirmHandover">' +
+              esc(t('confirm_handover')) + '</button>' : '') + '</div>' +
           '<div class="card"><div class="cardhead"><div><h2>' + esc(I.date(open[0].date, true)) + '</h2>' +
-            '<div class="sub">' + esc(t('submitted_by')) + ' ' + esc(pname(open[0].submittedBy)) + '</div></div>' +
-            '<div class="spacer"></div><span class="pill warn">' + esc(t('open_period')) + '</span></div>' +
+            '<div class="sub">' + esc(t('submitted_by')) + ' ' + esc(pname(open[0].submittedBy)) + '</div></div></div>' +
             dayLadder(open[0]) +
-            (can.write() ? '<button class="btn" style="width:100%;margin-top:14px" data-action="settleDay" data-id="' +
-              open[0].id + '">' + esc(t('settle')) + '</button>' : '') + '</div>' +
-          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('car_expenses')) + '</h2>' +
-            '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
-            '<div class="stack">' + open[0].expenses.map(e =>
+            '<div class="stack" style="margin-top:12px">' + open[0].expenses.map(e =>
               '<div class="rowline"><div class="dot" style="background:' +
                   (kindOf(e) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '">' +
                   esc(t('e_' + e.label).slice(0, 2)) + '</div>' +
@@ -691,8 +733,8 @@
             '<td class="num">' + money(c.indirect) + '</td><td class="num">' + money(c.net) + '</td>' +
             '<td class="num">' + money(c.uncle) + '</td><td class="num"><b>' + money(c.family) + '</b></td>' +
             '<td class="num">' + money(c.marwa) + '</td>' +
-            '<td><span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
-              esc(c.status === 'open' ? t('open_period') : t('settled')) + '</span></td></tr>').join('') +
+            '<td><span class="pill ' + (c.status === 'recorded' ? 'warn' : 'ok') + '">' +
+              esc(c.status === 'recorded' ? t('open_period') : t('settled')) + '</span></td></tr>').join('') +
         '</tbody></table></div></div>';
     }
   };
@@ -777,8 +819,8 @@
           (mine.length ? '<div class="stack">' + mine.map(c =>
             '<div class="rowline"><div class="m"><div class="n">' + esc(I.date(c.date, true)) + '</div>' +
               '<div class="w">' + esc(c.worked ? t('day_gross') + ' ' + money(c.gross) : t('day_off')) + '</div></div>' +
-              '<span class="pill ' + (!c.worked ? '' : c.status === 'open' ? 'warn' : 'ok') + '">' +
-                esc(!c.worked ? t('day_off') : c.status === 'open' ? t('awaiting') : t('settled')) + '</span>' +
+              '<span class="pill ' + (!c.worked ? '' : c.status === 'recorded' ? 'warn' : 'ok') + '">' +
+                esc(!c.worked ? t('day_off') : c.status === 'recorded' ? t('awaiting') : t('settled')) + '</span>' +
               '<div class="amt' + (c.worked ? ' plus' : '') + '">' + (c.worked ? money(c.uncle) : '\u2014') + '</div></div>').join('') + '</div>'
             : '<div class="empty">' + esc(t('no_days')) + '</div>') + '</div></div>';
     },
@@ -804,7 +846,7 @@
       const total = settled.reduce((s, c) => s + c.uncle, 0);
       const win = settled.filter(c => inWindow(c, 30));
       const win30 = win.reduce((s, c) => s + c.uncle, 0);
-      const awaiting = mine.filter(c => c.status === 'open').reduce((s, c) => s + c.uncle, 0);
+      const awaiting = mine.filter(c => c.status === 'recorded').reduce((s, c) => s + c.uncle, 0);
 
       return '<p class="lead">' + esc(t('my_earnings_sub')) + '</p>' +
         '<div class="grid k4">' +
@@ -815,7 +857,8 @@
             '<div class="v plus">' + money(win30) + '</div>' +
             '<div class="w">' + I.n(win.length) + ' ' + esc(t('days_driven')) + '</div></div>' +
           '<div class="card kpi"><div class="k">' + esc(t('awaiting')) + '</div>' +
-            '<div class="v">' + money(awaiting) + '</div></div>' +
+            '<div class="v">' + money(awaiting) + '</div>' +
+            '<div class="w">' + esc(t('handover_note_short')) + '</div></div>' +
           '<div class="card kpi"><div class="k">' + esc(t('day_gross')) + ' · ' + esc(t('earned_month')) + '</div>' +
             '<div class="v">' + money(win.reduce((s, c) => s + c.gross, 0)) + '</div></div>' +
         '</div>' +
@@ -828,8 +871,8 @@
             '<td><span class="chips">' + expenseChips(c) + '</span></td>' +
             '<td class="num">' + money(c.net) + '</td>' +
             '<td class="num"><b>' + money(c.uncle) + '</b></td>' +
-            '<td><span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
-              esc(c.status === 'open' ? t('awaiting') : t('settled')) + '</span></td></tr>').join('') +
+            '<td><span class="pill ' + (c.status === 'recorded' ? 'warn' : 'ok') + '">' +
+              esc(c.status === 'recorded' ? t('awaiting') : t('settled')) + '</span></td></tr>').join('') +
         '</tbody></table></div></div>';
     }
   };
@@ -942,12 +985,20 @@
       type: 'expense', status: m.status, by: m.person
     }));
 
+    D.handovers.forEach(h => rows.push({
+      id: h.id, src: 'car', date: h.date, person: 'uncle',
+      label: t('n_car_handover') + ' \u00b7 ' + t('results_count', { n: I.n(h.days.length) }),
+      cat: 'carprofit', amount: Math.abs(h.amount), sign: h.amount >= 0 ? 1 : -1,
+      type: h.amount >= 0 ? 'income' : 'expense', status: null, by: h.by
+    }));
+
     D.carDays.forEach(c => rows.push({
       id: c.id, src: 'car', date: c.date,
       person: c.submittedBy,
       label: c.worked ? t('day_gross') + ' ' + money(c.gross) : t('day_off'),
-      cat: 'carprofit', amount: c.worked ? c.family : 0,
-      sign: c.worked ? 1 : 0,
+      // A recorded day is not money yet — it becomes money at handover, so
+      // it carries no sign here and cannot double-count against the ledger.
+      cat: 'carprofit', amount: c.worked ? Math.abs(c.family) : 0, sign: 0,
       type: 'income', status: c.worked ? c.status : 'off', by: c.submittedBy,
       car: c
     }));
@@ -1227,8 +1278,35 @@
       document.documentElement.dir = I.isRTL() ? 'rtl' : 'ltr';
       render();
     },
-    signin: function (el) { state.user = person(el.dataset.id); state.screen = 'dashboard'; render(); },
-    signout: function () { state.user = null; render(); },
+    login: function () {
+      const email = document.getElementById('lEmail').value;
+      const pass  = document.getElementById('lPass').value;
+      const res = D.authenticate(email, pass);
+      if (res.error) {
+        state.loginEmail = email;
+        state.loginError = 'err_' + res.error;
+        renderAuth();
+        return;
+      }
+      state.user = res.person;
+      state.loginError = null;
+      state.loginEmail = '';
+      state.screen = 'dashboard';
+      render();
+    },
+
+    // demo convenience: fill the form for one of the sample accounts
+    fill: function (el) {
+      const p = person(el.dataset.id);
+      state.loginEmail = p.email;
+      state.loginError = null;
+      renderAuth();
+      document.getElementById('lPass').value = 'demo1234';
+      document.getElementById('lPass').focus();
+    },
+
+    forgot: function () { toast(t('forgot_note')); },
+    signout: function () { state.user = null; state.loginEmail = ''; state.loginError = null; render(); },
     go: function (el) { state.screen = el.dataset.s; state.filters = { q:'', type:'all', cat:'all', person:'all', src:'all' }; renderShell(); },
     type: function (el) { state.addType = el.dataset.v; state.addCat = null; state.addCurrency = 'EGP'; renderShell(); },
     cat: function (el) { state.addCat = el.dataset.c; renderShell(); },
@@ -1292,13 +1370,22 @@
       renderShell(); toast(t('saved'));
     },
 
+    confirmHandover: function () {
+      // Abdo confirms he has the cash. Whatever days it covers, it covers.
+      const ids = D.carDays.filter(c => c.status === 'recorded').map(c => c.id);
+      if (!ids.length) { toast(t('already_settled')); return; }
+      const h = D.confirmHandover(ids, D.TODAY, state.user.id);
+      renderShell();
+      toast(h ? t('handover_saved') : t('already_settled'));
+    },
+
     settleDay: function (el) {
       const c = D.carDays.find(x => x.id === el.dataset.id);
       // Guard on the status, not on what the screen last rendered — two
       // devices settling the same day would otherwise post income twice.
       // In SQL: UPDATE ... WHERE id = ? AND status = 'open', then check
       // the affected row count.
-      if (!c || c.status !== 'open') { toast(t('already_settled')); return; }
+      if (!c || c.status !== 'recorded') { toast(t('already_settled')); return; }
       c.status = 'settled';
       c.settledBy = state.user.id;
       D.add({ type:'income', cat:'carprofit', amount:c.family, date:c.date, note:'n_car_share', src:c.id });
