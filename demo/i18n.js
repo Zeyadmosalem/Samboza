@@ -29,10 +29,10 @@ window.I18N = (function () {
 
     /* people */
     p_mother:'Mother', p_abdo:'Abdo', p_zeyad:'Zeyad', p_rewan:'Rewan',
-    p_mona:'Mona', p_grandma:'Grandma', p_marwa:'Marwa', p_uncle:'Uncle',
+    p_mona:'Mona', p_grandma:'Grandma', p_marwa:'Marwa', p_uncle:'Uncle Joe',
     p_adamanas:'Adam & Anas',
     r_mother:'Mother', r_brother:'Big brother', r_son:'Son', r_daughter:'Daughter',
-    r_aunt:'Aunt', r_grandmother:'Grandmother', r_uncle:'Uncle', r_cousins:'Cousins',
+    r_aunt:'Aunt', r_grandmother:'Grandmother', r_uncle_maternal:'Uncle (mother’s side)', r_cousins:'Cousins',
 
     /* categories */
     c_allowance:'Allowance', c_rent:'Rent', c_food:'Food', c_education:'Education',
@@ -73,12 +73,12 @@ window.I18N = (function () {
     of_allowance:'of this month’s allowance',
 
     /* car */
-    car_title:'The Uber car', car_sub:'Uncle drives, and takes a third of the gross. The rest covers running costs; what is left splits 75% to the family and 25% to Marwa.',
-    gross:'Gross income', uncle_share:'Uncle’s share (⅓)', operating_pool:'Operating pool (⅔)',
+    car_title:'The Uber car', car_sub:'Joe drives and submits each day himself. Every expense he records comes off that day’s takings first; he then takes a third of what is left, and the remainder splits 75% to the family and 25% to Marwa.',
+    gross:'Gross income', uncle_share:'Joe’s share (⅓)', operating_pool:'Remaining (⅔)',
     car_expenses:'Car expenses', profit:'Profit', family_share:'Family share (75%)', marwa_share:'Marwa’s share (25%)',
     settle:'Settle this period', settled:'Settled', open_period:'Open', add_car_expense:'Add car expense',
     fuel:'Fuel', maintenance:'Maintenance', licensing:'Licensing', car_history:'Past settlements',
-    period:'Period', status:'Status', car_calc:'The app does the arithmetic — Abdo only enters gross and expenses.',
+    period:'Period', status:'Status', car_calc:'Settled daily. Joe submits the takings and costs; the app does the arithmetic.',
 
     /* loans */
     loan_title:'Loans', loan_sub:'Kept apart from ordinary income so the family can see what it still owes.',
@@ -111,23 +111,61 @@ window.I18N = (function () {
     invite_note:'The invite code is separate from the family code on purpose: it grants access, so it has to be revocable without changing who the family is.',
     signing_into:'Signing in to',
 
+    /* driver (Joe) */
+    role_driver:'Driver', role_driver_note:'Submits the car’s takings and running costs',
+    nav_carday:'Record a Day', nav_myearnings:'My Earnings', nav_approvals:'Approvals',
+    day_gross:'Takings for the day', date_of_day:'Which day?',
+    date_hint:'Pick the day you drove. Days off are simply not submitted — nothing is assumed about today.',
+    submit_day:'Submit this day', day_saved:'Day submitted', recent_days:'Recent days',
+    days_driven:'Days driven', earned_total:'Earned to date', earned_month:'Last 30 days',
+    awaiting:'Awaiting settlement', no_days:'Nothing submitted yet',
+    my_earnings_sub:'Every day you have submitted, and what it earned you.',
+    carday_sub:'Enter the day’s takings and what it cost to earn them. The app works out your third.',
+
+    /* car expense classification */
+    direct:'Direct', indirect:'Indirect', expense_kind:'Type', add_expense_row:'Add expense',
+    kind_note:'Direct is what it cost to earn the fares — fuel, tolls. Indirect is administration, the kārta permit, a traffic fine. Both come off the takings before your third; the label is what the family reports on.',
+    e_fuel:'Fuel', e_tolls:'Tolls', e_permit:'Permit (kārta)', e_admin:'Administration', e_ticket:'Traffic fine',
+    net_after:'Net after expenses', joe_share:'Joe’s share (⅓)', remaining_after:'Remaining after Joe’s share',
+    total_direct:'Direct expenses', total_indirect:'Indirect expenses',
+
+    /* approvals */
+    approvals_sub:'Everything Zeyad and Rewan submit waits here. It does not move their balance until you approve it.',
+    pending:'Pending', approved:'Approved', rejected:'Rejected', approve:'Approve', reject:'Reject',
+    nothing_pending:'Nothing waiting for you', submitted_by:'Submitted by', pending_count:'{n} waiting',
+    member_pending_note:'Waiting for Abdo to approve. It will not change your balance until he does.',
+    pending_total:'Pending', decided:'Decided',
+
+    /* allowance rates */
+    allow_rate_note:'A fixed monthly amount per person that can be raised or lowered. A change is dated, so it never rewrites what was already paid.',
+    rate_since:'Since {d}',
+
     /* settings */
     set_title:'Settings', set_cats:'Categories', set_cats_sub:'Abdo can add to the default set.',
     set_fx:'Exchange rates', set_fx_sub:'Entered per remittance and stored with the record.',
     set_lang:'Language', theme_toggle:'Switch between light and dark', set_export:'Export', set_export_sub:'CSV and Excel land in Phase 2.',
-    set_open:'Open questions for this meeting',
-    set_open_sub:'The demo picked a default for each of these. They are the decisions worth settling today.',
+    set_open:'Decisions',
+    set_open_sub:'Settled with the family on 4 September 2026. Each one is built into this demo.',
 
     /* open questions (§10) */
-    q1:'Car settlement runs monthly here. Daily or weekly instead?',
-    q2:'Uncle’s third is taken off gross, before any expense. Correct?',
-    q3:'Allowance is a fixed monthly amount per person. Or ad-hoc when Mother visits?',
-    q4:'Abdo types the FX rate himself. Or pull it from a rate API?',
-    q5:'Zeyad and Rewan post straight to the ledger, no approval step. Should Abdo approve?',
-    q6:'Zeyad and Rewan see only their own numbers, not family totals. Right call?',
-    q7:'Gifts record an amount but not who received it. Track the recipient too?',
-    q8:'One pot of money. Or split cash from bank/wallet?',
-    q9:'Gregorian dates and English by default. Hijri dates? Arabic from day one?',
+    q1:'Car settlement period',
+    q2:'When Joe’s third is taken',
+    q3:'Allowance cadence',
+    q4:'FX rate source',
+    q5:'Approval for member submissions',
+    q6:'What members can see',
+    q7:'Gifts',
+    q8:'Cash vs bank',
+    q9:'Calendar and language',
+    a1:'Daily. Joe picks the date himself — there are days off.',
+    a2:'After expenses. He classifies each one direct or indirect as he enters it.',
+    a3:'Fixed monthly per person, and it can be raised or lowered over time.',
+    a4:'Abdo types it himself, stored with the record.',
+    a5:'Yes — nothing moves a balance until Abdo approves it.',
+    a6:'Strictly their own numbers, never family totals.',
+    a7:'Record the recipient, with an optional note.',
+    a8:'One pot. No account separation.',
+    a9:'Gregorian only. English and Arabic from day one.',
 
     /* misc */
     egp:'EGP', person:'Person', amount_egp:'Amount (EGP)', actions:'Actions',
@@ -171,10 +209,10 @@ window.I18N = (function () {
     readonly_banner:'عرض للاطلاع فقط — ترى كل شيء، لكن لا يمكن تعديل أي شيء من هذا الحساب.',
 
     p_mother:'الوالدة', p_abdo:'عبده', p_zeyad:'زياد', p_rewan:'روان',
-    p_mona:'منى', p_grandma:'الجدة', p_marwa:'مروة', p_uncle:'العم',
+    p_mona:'منى', p_grandma:'الجدة', p_marwa:'مروة', p_uncle:'الخال جو',
     p_adamanas:'آدم وأنس',
     r_mother:'الوالدة', r_brother:'الأخ الأكبر', r_son:'الابن', r_daughter:'الابنة',
-    r_aunt:'الخالة', r_grandmother:'الجدة', r_uncle:'العم', r_cousins:'أولاد الخالة',
+    r_aunt:'الخالة', r_grandmother:'الجدة', r_uncle_maternal:'الخال', r_cousins:'أولاد الخالة',
 
     c_allowance:'المصروف', c_rent:'الإيجار', c_food:'الأكل', c_education:'التعليم',
     c_medical:'العلاج', c_gifts:'الهدايا', c_car:'السيارة', c_loanrepay:'سداد سلفة',
@@ -208,12 +246,12 @@ window.I18N = (function () {
     log_expense:'تسجيل مصروف', my_history:'سجلي', habits:'فلوسي بتروح فين',
     of_allowance:'من مصروف الشهر',
 
-    car_title:'سيارة أوبر', car_sub:'العم بيسوق وياخد ثلث الإيراد. الباقي بيغطي مصاريف السيارة، واللي يفضل بينقسم ٧٥٪ للعائلة و٢٥٪ لمروة.',
-    gross:'إجمالي الإيراد', uncle_share:'نصيب العم (⅓)', operating_pool:'وعاء التشغيل (⅔)',
+    car_title:'سيارة أوبر', car_sub:'الخال جو بيسوق وبيسجل كل يوم بنفسه. أي مصروف بيسجله بيتخصم من إيراد اليوم الأول؛ بعدين بياخد ثلث الباقي، واللي يفضل بينقسم ٧٥٪ للعائلة و٢٥٪ لمروة.',
+    gross:'إجمالي الإيراد', uncle_share:'نصيب الخال جو (⅓)', operating_pool:'الباقي (⅔)',
     car_expenses:'مصاريف السيارة', profit:'صافي الربح', family_share:'نصيب العائلة (٧٥٪)', marwa_share:'نصيب مروة (٢٥٪)',
     settle:'تسوية الفترة', settled:'تمت التسوية', open_period:'مفتوحة', add_car_expense:'إضافة مصروف سيارة',
     fuel:'بنزين', maintenance:'صيانة', licensing:'ترخيص', car_history:'التسويات السابقة',
-    period:'الفترة', status:'الحالة', car_calc:'التطبيق بيعمل الحسبة — عبده بيدخل الإيراد والمصاريف بس.',
+    period:'الفترة', status:'الحالة', car_calc:'التسوية يومية. الخال جو بيسجل الإيراد والمصاريف، والتطبيق بيعمل الحسبة.',
 
     loan_title:'السلف', loan_sub:'مفصولة عن الوارد العادي عشان العائلة تشوف المستحق عليها.',
     lender:'المُقرِض', borrowed:'مستلفة', lent:'مُقرَضة', outstanding:'قائمة',
@@ -242,21 +280,60 @@ window.I18N = (function () {
     invite_note:'كود الدعوة منفصل عن كود العائلة عن قصد: هو بيمنح صلاحية دخول، فلازم نقدر نلغيه من غير ما نغيّر هوية العائلة.',
     signing_into:'تسجيل الدخول إلى',
 
+    /* driver (Joe) */
+    role_driver:'السائق', role_driver_note:'يسجل إيراد السيارة ومصاريفها',
+    nav_carday:'تسجيل يوم', nav_myearnings:'أرباحي', nav_approvals:'الموافقات',
+    day_gross:'إيراد اليوم', date_of_day:'أي يوم؟',
+    date_hint:'اختر اليوم اللي اشتغلت فيه. أيام الراحة ببساطة مش بتتسجل — التطبيق مش بيفترض إن النهاردة يوم شغل.',
+    submit_day:'تسجيل اليوم', day_saved:'تم تسجيل اليوم', recent_days:'الأيام الأخيرة',
+    days_driven:'أيام العمل', earned_total:'المكتسب حتى الآن', earned_month:'آخر ٣٠ يوم',
+    awaiting:'في انتظار التسوية', no_days:'لا يوجد تسجيل بعد',
+    my_earnings_sub:'كل يوم سجّلته، وكام كسبت منه.',
+    carday_sub:'دخّل إيراد اليوم واللي دفعته عشان تكسبه. التطبيق بيحسب نصيبك.',
+
+    /* car expense classification */
+    direct:'مباشرة', indirect:'غير مباشرة', expense_kind:'النوع', add_expense_row:'إضافة مصروف',
+    kind_note:'المباشرة هي اللي دفعتها عشان تكسب اليوم — بنزين ورسوم طرق. غير المباشرة مصاريف إدارية أو الكارتة أو مخالفة. الاتنين بيتخصموا من الإيراد قبل نصيبك؛ التصنيف بس عشان العائلة تعرف الفلوس راحت فين.',
+    e_fuel:'بنزين', e_tolls:'رسوم طرق', e_permit:'كارتة', e_admin:'مصاريف إدارية', e_ticket:'مخالفة',
+    net_after:'الصافي بعد المصاريف', joe_share:'نصيب الخال جو (⅓)', remaining_after:'الباقي بعد نصيب الخال',
+    total_direct:'مصاريف مباشرة', total_indirect:'مصاريف غير مباشرة',
+
+    /* approvals */
+    approvals_sub:'كل اللي زياد وروان بيسجلوه بيستنى هنا. مش بيأثر على رصيدهم غير لما توافق.',
+    pending:'في الانتظار', approved:'تمت الموافقة', rejected:'مرفوض', approve:'موافقة', reject:'رفض',
+    nothing_pending:'مفيش حاجة مستنية منك', submitted_by:'مقدَّم من', pending_count:'{n} في الانتظار',
+    member_pending_note:'في انتظار موافقة عبده. مش هيتغير رصيدك غير لما يوافق.',
+    pending_total:'في الانتظار', decided:'تم البت فيها',
+
+    /* allowance rates */
+    allow_rate_note:'مبلغ شهري ثابت لكل شخص، يقدر يزيد أو يقل. أي تغيير بيتسجل بتاريخه، فمش بيغيّر اللي اتصرف قبل كده.',
+    rate_since:'من {d}',
+
+    /* settings */
     set_title:'الإعدادات', set_cats:'التصنيفات', set_cats_sub:'عبده يقدر يضيف على المجموعة الافتراضية.',
     set_fx:'أسعار الصرف', set_fx_sub:'تُدخل مع كل حوالة وتُحفظ مع السجل.',
     set_lang:'اللغة', theme_toggle:'تبديل بين الفاتح والداكن', set_export:'التصدير', set_export_sub:'CSV و Excel في المرحلة الثانية.',
-    set_open:'أسئلة مفتوحة للاجتماع',
-    set_open_sub:'العرض التجريبي اختار إجابة افتراضية لكل سؤال. دي القرارات اللي تستاهل نحسمها النهاردة.',
+    set_open:'القرارات',
+    set_open_sub:'اتحسمت مع العيلة يوم ٤ سبتمبر ٢٠٢٦. وكل قرار منهم متطبق في العرض ده.',
 
-    q1:'تسوية السيارة شهرية هنا. يومية ولا أسبوعية بدل كده؟',
-    q2:'ثلث العم بيتحسب على الإيراد قبل أي مصروف. صح كده؟',
-    q3:'المصروف مبلغ شهري ثابت لكل شخص. ولا وقت ما الوالدة تزور؟',
-    q4:'عبده بيكتب سعر الصرف بنفسه. ولا نجيبه من API؟',
-    q5:'زياد وروان بيسجلوا في الدفتر على طول من غير موافقة. لازم عبده يوافق؟',
-    q6:'زياد وروان بيشوفوا أرقامهم بس، مش إجمالي العائلة. القرار ده صح؟',
-    q7:'الهدايا بتسجل المبلغ من غير المستلم. نسجل المستلم كمان؟',
-    q8:'كل الفلوس في وعاء واحد. ولا نفصل الكاش عن البنك/المحفظة؟',
-    q9:'تواريخ ميلادية وإنجليزي افتراضيًا. نضيف الهجري؟ عربي من أول يوم؟',
+    q1:'دورية تسوية السيارة',
+    q2:'إمتى بياخد الخال نصيبه',
+    q3:'نظام المصروف',
+    q4:'مصدر سعر الصرف',
+    q5:'الموافقة على تسجيلات الأعضاء',
+    q6:'اللي الأعضاء يشوفوه',
+    q7:'الهدايا',
+    q8:'الكاش والبنك',
+    q9:'التقويم واللغة',
+    a1:'يومية. الخال جو بيختار التاريخ بنفسه — في أيام راحة.',
+    a2:'بعد المصاريف. وبيصنّف كل مصروف مباشر ولا غير مباشر وهو بيسجله.',
+    a3:'مبلغ شهري ثابت لكل شخص، ويقدر يزيد أو يقل مع الوقت.',
+    a4:'عبده بيكتبه بنفسه، ويتحفظ مع السجل.',
+    a5:'نعم — مفيش حاجة بتأثر على الرصيد غير لما عبده يوافق.',
+    a6:'أرقامهم هم بس، ومش بيشوفوا إجمالي العائلة.',
+    a7:'نسجل المستلم، مع ملاحظة اختيارية.',
+    a8:'وعاء واحد. من غير فصل حسابات.',
+    a9:'ميلادي بس. إنجليزي وعربي من أول يوم.',
 
     egp:'ج.م', person:'الشخص', amount_egp:'المبلغ (ج.م)', actions:'إجراءات',
     add:'إضافة', cancel:'إلغاء', close:'إغلاق', of:'من', none:'لا شيء',

@@ -13,7 +13,9 @@
     addCat: null,
     addCurrency: 'EGP',
     filters: { q: '', type: 'all', cat: 'all', person: 'all' },
-    tables: {}
+    tables: {},
+    day: null            // Joe's in-progress day submission
+
   };
 
   /* ── helpers ───────────────────────────────────────────────────────── */
@@ -87,8 +89,11 @@
   const can = {
     write:  () => state.user && state.user.role === 'admin',
     member: () => state.user && state.user.role === 'member',
-    viewer: () => state.user && state.user.role === 'viewer'
+    viewer: () => state.user && state.user.role === 'viewer',
+    driver: () => state.user && state.user.role === 'driver'
   };
+
+  const pendingTx = () => D.memberTx.filter(m => m.status === 'pending');
 
   /* ── icons ─────────────────────────────────────────────────────────── */
   const ICON = {
@@ -105,20 +110,25 @@
     settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
     info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
     sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-    moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/>'
+    moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/>',
+    carday:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18M12 13.5v5M9.5 16h5"/>',
+    myearnings:'<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v11c0 1.7 3.1 3 7 3s7-1.3 7-3v-11"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+    approvals:'<path d="M20 11V6.5A2.5 2.5 0 0 0 17.5 4h-11A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H12"/><path d="M15 18l2.5 2.5L22 16"/>'
   };
   const icon = (k, cls) => '<svg class="' + (cls || 'ico') + '" viewBox="0 0 24 24">' + ICON[k] + '</svg>';
 
   /* ── navigation ────────────────────────────────────────────────────── */
   const NAV = [
-    { group:'nav_group_money',  items:['dashboard','add','remittance','allowance','car','loans'] },
-    { group:'nav_group_family', items:['myspending','history','reports','people'] },
+    { group:'nav_group_money',  items:['dashboard','add','carday','remittance','allowance','car','loans'] },
+    { group:'nav_group_family', items:['myspending','myearnings','approvals','history','reports','people'] },
     { group:'nav_group_admin',  items:['settings'] }
   ];
   const ACCESS = {
-    dashboard:['admin','member','viewer'], add:['admin','member'], remittance:['admin','viewer'],
-    allowance:['admin','viewer'], car:['admin','viewer'], loans:['admin','viewer'],
-    myspending:['member'], history:['admin','member','viewer'], reports:['admin','viewer'],
+    dashboard:['admin','member','viewer','driver'], add:['admin','member'],
+    carday:['driver'], myearnings:['driver'],
+    remittance:['admin','viewer'], allowance:['admin','viewer'], car:['admin','viewer'],
+    loans:['admin','viewer'], myspending:['member'], approvals:['admin'],
+    history:['admin','member','viewer'], reports:['admin','viewer'],
     people:['admin'], settings:['admin']
   };
   const allowed = s => ACCESS[s].indexOf(state.user.role) >= 0;
@@ -165,7 +175,10 @@
       if (!items.length) return '';
       return '<div class="navgroup">' + esc(t(g.group)) + '</div>' + items.map(s =>
         '<button class="navitem ' + (state.screen === s ? 'on' : '') + '" data-action="go" data-s="' + s + '">' +
-          icon(s) + '<span>' + esc(t('nav_' + s)) + '</span></button>').join('');
+          icon(s) + '<span>' + esc(t('nav_' + s)) + '</span>' +
+          (s === 'approvals' && pendingTx().length
+            ? '<span class="navbadge">' + I.n(pendingTx().length) + '</span>' : '') +
+        '</button>').join('');
     }).join('');
 
     root.innerHTML =
@@ -247,6 +260,7 @@
   SCREENS.dashboard = {
     html: function () {
       if (can.member()) return memberDashboard();
+      if (can.driver()) return driverDashboard();
       const inc30 = sum(income().filter(x => inWindow(x, 30)));
       const exp30 = sum(expense().filter(x => inWindow(x, 30)));
       const net = inc30 - exp30;
@@ -281,6 +295,7 @@
     },
     after: function () {
       if (can.member()) return afterMemberDashboard();
+      if (can.driver()) return;
       const slices = donutSlices(catTotals(expense().filter(x => MONTHS.indexOf(x.date.getMonth() + 1) >= 0)));
       Ch.donut(document.getElementById('dashDonut'), {
         slices, fmt: v => money(v), centerLabel: t('total')
@@ -297,10 +312,49 @@
   }
 
   /* Dashboard — member */
+  /* Approved submissions move the balance; pending ones are shown but do
+     not count until Abdo decides (decision D5). */
+  /* Dashboard — Joe. He sees his own earnings, never the family ledger. */
+  function driverDashboard() {
+    const mine = D.carDays.filter(c => c.submittedBy === state.user.id).sort(byDateDesc);
+    const settled = mine.filter(c => c.status === 'settled');
+    const win = settled.filter(c => inWindow(c, 30));
+    const open = mine.filter(c => c.status === 'open');
+    return '<div class="grid k4">' +
+        '<div class="card hero kpi"><div class="k">' + esc(t('earned_month')) + '</div>' +
+          '<div class="v">' + money(win.reduce((s, c) => s + c.uncle, 0)) + '</div>' +
+          '<div class="w">' + I.n(win.length) + ' ' + esc(t('days_driven')) + '</div></div>' +
+        '<div class="card kpi"><div class="k">' + esc(t('earned_total')) + '</div>' +
+          '<div class="v plus">' + money(settled.reduce((s, c) => s + c.uncle, 0)) + '</div></div>' +
+        '<div class="card kpi"><div class="k">' + esc(t('awaiting')) + '</div>' +
+          '<div class="v">' + money(open.reduce((s, c) => s + c.uncle, 0)) + '</div>' +
+          '<div class="w">' + I.n(open.length) + '</div></div>' +
+        '<div class="card kpi"><div class="k">' + esc(t('day_gross')) + ' · ' + esc(t('earned_month')) + '</div>' +
+          '<div class="v">' + money(win.reduce((s, c) => s + c.gross, 0)) + '</div></div>' +
+      '</div>' +
+      '<div class="grid split" style="margin-top:16px">' +
+        '<div class="card"><div class="cardhead"><div><h2>' + esc(t('recent_days')) + '</h2></div>' +
+          '<div class="spacer"></div><button class="btn sm" data-action="go" data-s="carday">' +
+            esc(t('nav_carday')) + '</button></div>' +
+          '<div class="stack">' + mine.slice(0, 8).map(c =>
+            '<div class="rowline"><div class="m"><div class="n">' + esc(I.date(c.date, true)) + '</div>' +
+              '<div class="w">' + esc(t('day_gross')) + ' ' + money(c.gross) + ' · ' +
+                esc(t('car_expenses')) + ' ' + money(c.direct + c.indirect) + '</div></div>' +
+              '<span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
+                esc(c.status === 'open' ? t('awaiting') : t('settled')) + '</span>' +
+              '<div class="amt plus">' + money(c.uncle) + '</div></div>').join('') + '</div></div>' +
+        '<div class="card"><div class="cardhead"><div><h2>' + esc(t('car_title')) + '</h2>' +
+          '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
+          dayLadder(mine[0]) + '</div>' +
+      '</div>';
+  }
+
   function memberSummary(id) {
     const received = D.allowances.filter(a => a.person === id).reduce((s, a) => s + a.amount, 0);
-    const spent = sum(D.memberTx.filter(m => m.person === id));
-    return { received, spent, balance: received - spent };
+    const mine = D.memberTx.filter(m => m.person === id);
+    const spent = sum(mine.filter(m => m.status === 'approved'));
+    const pending = sum(mine.filter(m => m.status === 'pending'));
+    return { received, spent, pending, balance: received - spent };
   }
 
   function memberDashboard() {
@@ -326,23 +380,28 @@
         '<div class="card"><div class="cardhead"><div><h2>' + esc(t('habits')) + '</h2>' +
           '<div class="sub">' + esc(t('rep_cat_sub')) + '</div></div></div>' +
           '<div id="dashDonut"></div>' +
-          legendHtml(donutSlices(catTotals(D.memberTx.filter(m => m.person === id)))) + '</div>' +
+          legendHtml(donutSlices(catTotals(D.memberTx.filter(m => m.person === id && m.status === 'approved')))) + '</div>' +
       '</div>';
   }
 
   function afterMemberDashboard() {
     const id = state.user.id;
     Ch.donut(document.getElementById('dashDonut'), {
-      slices: donutSlices(catTotals(D.memberTx.filter(m => m.person === id))),
+      slices: donutSlices(catTotals(D.memberTx.filter(m => m.person === id && m.status === 'approved'))),
       fmt: v => money(v), centerLabel: t('total')
     });
   }
+
+  const statusPill = st =>
+    '<span class="pill ' + (st === 'approved' ? 'ok' : st === 'rejected' ? 'due' : 'warn') + '">' +
+      esc(t(st)) + '</span>';
 
   const memberRow = m =>
     '<div class="tx"><div class="dot" style="background:' + ccolor(m.cat) + '">' + esc(cname(m.cat).slice(0, 2)) + '</div>' +
       '<div class="m"><div class="n">' + esc(t(m.note)) + '</div>' +
         '<div class="w"><span>' + esc(cname(m.cat)) + '</span><span>' + esc(I.date(m.date)) + '</span></div></div>' +
-      '<div class="amt minus">−' + money(m.amount) + '</div></div>';
+      (m.status && m.status !== 'approved' ? statusPill(m.status) : '') +
+      '<div class="amt ' + (m.status === 'approved' ? 'minus' : '') + '">−' + money(m.amount) + '</div></div>';
 
   /* Add transaction */
   SCREENS.add = {
@@ -467,7 +526,7 @@
       const paidThis = id => D.allowances.some(a => a.person === id && a.month === monthNow);
       const anyDue = recips.some(p => !paidThis(p.id));
 
-      return '<p class="lead">' + esc(t('allow_sub')) + '</p>' +
+      return '<p class="lead">' + esc(t('allow_sub')) + ' ' + esc(t('allow_rate_note')) + '</p>' +
         '<div class="grid k3">' +
           '<div class="card hero kpi"><div class="k">' + esc(t('total_monthly')) + '</div><div class="v">' + money(totalMonthly) + '</div>' +
             '<div class="w">' + I.n(recips.length) + ' × ' + esc(t('recipient')) + '</div></div>' +
@@ -491,7 +550,14 @@
                 '<span class="avatar sm" style="background:' + hue(p) + '">' + esc(p.initials) + '</span>' + esc(pname(p.id)) + '</span></td>' +
               '<td><span class="pill">' + esc(t('r_' + p.rel)) + '</span> ' +
                 '<span class="pill">' + esc(logs ? t('logs_spending') : t('receives_only')) + '</span></td>' +
-              '<td class="num">' + money(p.allowance) + '</td>' +
+              '<td class="num">' + money(p.allowance) +
+                (function () {
+                  const hist = D.allowanceRates.filter(r => r.person === p.id);
+                  const since = hist[hist.length - 1];
+                  return hist.length > 1 || since.from.getMonth() > 0
+                    ? '<div class="w" style="font-size:11px;color:var(--sub)">' +
+                        esc(t('rate_since', { d: I.date(since.from, true) })) + '</div>' : '';
+                })() + '</td>' +
               '<td><span class="pill ' + (done ? 'ok' : 'due') + '">' + esc(done ? t('paid') : t('mark_paid')) + '</span></td>' +
               '<td class="num">' + (s ? money(s.balance) : '—') + '</td>' +
               (can.write() ? '<td>' + (done ? '' :
@@ -508,13 +574,16 @@
     html: function () {
       const id = state.user.id, s = memberSummary(id);
       const mine = D.memberTx.filter(m => m.person === id).sort(byDateDesc);
-      const slices = donutSlices(catTotals(mine));
+      const slices = donutSlices(catTotals(mine.filter(m => m.status === 'approved')));
       return '<p class="lead">' + esc(t('my_sub')) + '</p>' +
-        '<div class="grid k3">' +
+        '<div class="grid k4">' +
           '<div class="card hero kpi"><div class="k">' + esc(t('my_balance')) + '</div><div class="v">' + money(s.balance) + '</div>' +
             '<div class="w">' + esc(t('my_received')) + ' − ' + esc(t('my_spent')) + '</div></div>' +
           '<div class="card kpi"><div class="k">' + esc(t('my_received')) + '</div><div class="v plus">' + money(s.received) + '</div></div>' +
           '<div class="card kpi"><div class="k">' + esc(t('my_spent')) + '</div><div class="v minus">' + money(s.spent) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('pending_total')) + '</div>' +
+            '<div class="v">' + money(s.pending) + '</div>' +
+            '<div class="w">' + esc(s.pending ? t('member_pending_note') : t('nothing_pending')) + '</div></div>' +
         '</div>' +
         '<div class="grid split" style="margin-top:16px">' +
           '<div class="card"><div class="cardhead"><div><h2>' + esc(t('my_history')) + '</h2></div><div class="spacer"></div>' +
@@ -527,84 +596,260 @@
     after: function () {
       const id = state.user.id;
       Ch.donut(document.getElementById('mineDonut'), {
-        slices: donutSlices(catTotals(D.memberTx.filter(m => m.person === id))),
+        slices: donutSlices(catTotals(D.memberTx.filter(m => m.person === id && m.status === 'approved'))),
         fmt: v => money(v), centerLabel: t('total')
       });
     }
   };
 
-  /* Car */
+  /* ------------------------------------------------------------------
+     The car (decisions D1 and D2).
+
+     D1  Settled daily. Joe submits each working day himself and picks the
+         date, because there are days off and today cannot be assumed.
+     D2  Every expense comes off that day's takings BEFORE Joe's third.
+         Each is classified direct (fuel, tolls) or indirect (admin, the
+         kārta permit, a fine) when he records it; the label is what the
+         family reports on, not a different split.
+  ------------------------------------------------------------------ */
+  const kindOf = label => D.EXPENSE_KINDS[label] || 'direct';
+  const EXP_LABELS = Object.keys(D.EXPENSE_KINDS);
+
+  function dayLadder(c) {
+    const row = (label, value, cls, sign) =>
+      '<div class="calcrow ' + (cls || '') + '"><span class="l">' + esc(label) + '</span>' +
+      '<b>' + (sign === '-' ? '−' : '') + money(value) + '</b></div>';
+    return row(t('day_gross'), c.gross) +
+      row(t('total_direct'), c.direct, 'out', '-') +
+      row(t('total_indirect'), c.indirect, 'out', '-') +
+      '<div class="calcrow total"><span class="l">' + esc(t('net_after')) + '</span><b>' + money(c.net) + '</b></div>' +
+      row(t('joe_share'), c.uncle, 'out', '-') +
+      row(t('remaining_after'), c.rest) +
+      '<div class="calcrow total in"><span class="l">' + esc(t('family_share')) + '</span><b>' + money(c.family) + '</b></div>' +
+      row(t('marwa_share'), c.marwa, 'out');
+  }
+
+  const expenseChips = c => c.expenses.map(e =>
+    '<span class="chip"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:6px;background:' +
+      (kindOf(e.label) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '"></i>' +
+      esc(t('e_' + e.label)) + ' ' + money(e.amount) + '</span>').join('');
+
+  /* Car — what Abdo and the mother see */
   SCREENS.car = {
     html: function () {
-      const open = D.settlements.filter(s => s.status === 'open')[0] || D.settlements[D.settlements.length - 1];
-      const done = D.settlements.filter(s => s.status === 'settled').sort((a, b) => b.month - a.month);
-      const row = (label, value, cls) =>
-        '<div class="calcrow ' + (cls || '') + '"><span class="l">' + esc(label) + '</span><b>' + money(value) + '</b></div>';
+      const days = D.carDays.slice().sort(byDateDesc);
+      const open = days.filter(c => c.status === 'open');
+      const settled = days.filter(c => c.status === 'settled');
+      const win = settled.filter(c => inWindow(c, 30));
+      const tot = k => win.reduce((a, c) => a + c[k], 0);
+      const recent = days.slice(0, 14);
 
       return '<p class="lead">' + esc(t('car_sub')) + '</p>' +
-        '<div class="grid split">' +
-          '<div class="card"><div class="cardhead"><div><h2>' + esc(I.monthLabel(open.month, true)) + ' 2026</h2>' +
-            '<div class="sub">' + esc(t('car_calc')) + '</div></div><div class="spacer"></div>' +
-            '<span class="pill ' + (open.status === 'open' ? 'warn' : 'ok') + '">' +
-              esc(open.status === 'open' ? t('open_period') : t('settled')) + '</span></div>' +
-            (can.write() && open.status === 'open'
-              ? '<div class="field"><label>' + esc(t('gross')) + '</label>' +
-                  '<input id="cGross" class="input" inputmode="decimal" value="' + open.gross + '"></div>'
-              : row(t('gross'), open.gross)) +
-            '<div id="cCalc">' + carCalc(open) + '</div>' +
-            (can.write() && open.status === 'open'
-              ? '<button class="btn" style="width:100%;margin-top:14px" data-action="settle" data-id="' + open.id + '">' + esc(t('settle')) + '</button>'
-              : '') +
-          '</div>' +
-          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('car_expenses')) + '</h2>' +
-            '<div class="sub">' + esc(I.monthLabel(open.month, true)) + ' 2026</div></div></div>' +
-            '<div class="stack">' + open.expenses.map(e =>
-              '<div class="rowline"><div class="dot" style="background:var(--neutral)">' + esc(t(e.kind).slice(0, 2)) + '</div>' +
-                '<div class="m"><div class="n">' + esc(t(e.kind)) + '</div><div class="w">' + esc(I.date(e.date)) + '</div></div>' +
-                '<div class="amt minus">−' + money(e.amount) + '</div></div>').join('') + '</div>' +
-            '<div class="calcrow total"><span class="l">' + esc(t('car_expenses')) + '</span><b>' + money(open.spent) + '</b></div>' +
-          '</div>' +
+        '<div class="grid k4">' +
+          '<div class="card hero kpi"><div class="k">' + esc(t('family_share')) + ' · ' + esc(t('earned_month')) + '</div>' +
+            '<div class="v">' + money(tot('family')) + '</div>' +
+            '<div class="w">' + esc(t('gross')) + ' ' + money(tot('gross')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('joe_share')) + ' · ' + esc(t('earned_month')) + '</div>' +
+            '<div class="v">' + money(tot('uncle')) + '</div>' +
+            '<div class="w">' + esc(t('marwa_share')) + ' ' + money(tot('marwa')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('days_driven')) + ' · ' + esc(t('earned_month')) + '</div>' +
+            '<div class="v">' + I.n(win.length) + '</div>' +
+            '<div class="w">' + esc(t('total_direct')) + ' ' + money(tot('direct')) + ' · ' +
+              esc(t('total_indirect')) + ' ' + money(tot('indirect')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('awaiting')) + '</div>' +
+            '<div class="v ' + (open.length ? 'minus' : '') + '">' + I.n(open.length) + '</div>' +
+            '<div class="w">' + esc(t('car_calc')) + '</div></div>' +
         '</div>' +
-        '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('car_history')) + '</h2></div></div>' +
-          '<div class="tablewrap"><table><thead><tr><th>' + esc(t('period')) + '</th>' +
-            '<th class="num">' + esc(t('gross')) + '</th><th class="num">' + esc(t('uncle_share')) + '</th>' +
-            '<th class="num">' + esc(t('car_expenses')) + '</th><th class="num">' + esc(t('profit')) + '</th>' +
-            '<th class="num">' + esc(t('family_share')) + '</th><th class="num">' + esc(t('marwa_share')) + '</th>' +
-            '<th>' + esc(t('status')) + '</th></tr></thead><tbody>' +
-          done.map(s => '<tr><td>' + esc(I.monthLabel(s.month, true)) + ' 2026</td>' +
-            '<td class="num">' + money(s.gross) + '</td><td class="num">' + money(s.uncle) + '</td>' +
-            '<td class="num">' + money(s.spent) + '</td><td class="num">' + money(s.profit) + '</td>' +
-            '<td class="num"><b>' + money(s.family) + '</b></td><td class="num">' + money(s.marwa) + '</td>' +
-            '<td><span class="pill ok">' + esc(t('settled')) + '</span></td></tr>').join('') +
-          '</tbody></table></div></div>';
+
+        (open.length ? '<div class="grid split" style="margin-top:16px">' +
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(I.date(open[0].date, true)) + '</h2>' +
+            '<div class="sub">' + esc(t('submitted_by')) + ' ' + esc(pname(open[0].submittedBy)) + '</div></div>' +
+            '<div class="spacer"></div><span class="pill warn">' + esc(t('open_period')) + '</span></div>' +
+            dayLadder(open[0]) +
+            (can.write() ? '<button class="btn" style="width:100%;margin-top:14px" data-action="settleDay" data-id="' +
+              open[0].id + '">' + esc(t('settle')) + '</button>' : '') + '</div>' +
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('car_expenses')) + '</h2>' +
+            '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
+            '<div class="stack">' + open[0].expenses.map(e =>
+              '<div class="rowline"><div class="dot" style="background:' +
+                  (kindOf(e.label) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '">' +
+                  esc(t('e_' + e.label).slice(0, 2)) + '</div>' +
+                '<div class="m"><div class="n">' + esc(t('e_' + e.label)) + '</div>' +
+                  '<div class="w">' + esc(t(kindOf(e.label))) + '</div></div>' +
+                '<div class="amt minus">−' + money(e.amount) + '</div></div>').join('') + '</div></div>' +
+        '</div>' : '') +
+
+        '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('recent_days')) + '</h2>' +
+          '<div class="sub">' + esc(t('car_calc')) + '</div></div></div>' +
+          '<div class="tablewrap"><table><thead><tr><th>' + esc(t('date')) + '</th>' +
+            '<th class="num">' + esc(t('day_gross')) + '</th><th class="num">' + esc(t('direct')) + '</th>' +
+            '<th class="num">' + esc(t('indirect')) + '</th><th class="num">' + esc(t('net_after')) + '</th>' +
+            '<th class="num">' + esc(t('joe_share')) + '</th><th class="num">' + esc(t('family_share')) + '</th>' +
+            '<th class="num">' + esc(t('marwa_share')) + '</th><th>' + esc(t('status')) + '</th></tr></thead><tbody>' +
+          recent.map(c => '<tr><td>' + esc(I.date(c.date, true)) + '</td>' +
+            '<td class="num">' + money(c.gross) + '</td><td class="num">' + money(c.direct) + '</td>' +
+            '<td class="num">' + money(c.indirect) + '</td><td class="num">' + money(c.net) + '</td>' +
+            '<td class="num">' + money(c.uncle) + '</td><td class="num"><b>' + money(c.family) + '</b></td>' +
+            '<td class="num">' + money(c.marwa) + '</td>' +
+            '<td><span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
+              esc(c.status === 'open' ? t('open_period') : t('settled')) + '</span></td></tr>').join('') +
+        '</tbody></table></div></div>';
+    }
+  };
+
+  /* ------------------------------------------------------------------
+     Joe's own interface: he records the day, the app does the arithmetic.
+  ------------------------------------------------------------------ */
+  function blankDay() { return { date:'2026-09-01', gross:'', rows:[{ label:'fuel', amount:'' }] }; }
+
+  function readDayForm() {
+    const g = document.getElementById('dGross');
+    const rows = Array.prototype.slice.call(document.querySelectorAll('[data-exprow]')).map(r => ({
+      label: r.querySelector('.expLabel').value,
+      amount: r.querySelector('.expAmt').value
+    }));
+    const dt = document.getElementById('dDate');
+    return { date: dt ? dt.value : state.day.date, gross: g ? g.value : '', rows };
+  }
+
+  function previewDay() {
+    const box = document.getElementById('dayCalc');
+    if (!box) return;
+    const f = readDayForm();
+    const gross = Math.max(0, parseFloat(f.gross) || 0);
+    const items = f.rows.filter(r => (parseFloat(r.amount) || 0) > 0)
+                        .map(r => ({ label: r.label, amount: Math.round(parseFloat(r.amount)) }));
+    box.innerHTML = dayLadder(Object.assign({ gross }, D.settleDay(gross, items)));
+  }
+
+  SCREENS.carday = {
+    html: function () {
+      if (!state.day) state.day = blankDay();
+      const dy = state.day;
+      const mine = D.carDays.filter(c => c.submittedBy === state.user.id).sort(byDateDesc).slice(0, 6);
+
+      return '<p class="lead">' + esc(t('carday_sub')) + '</p>' +
+        '<div class="grid split"><div class="card">' +
+          '<div class="field"><label>' + esc(t('date_of_day')) + '</label>' +
+            '<input id="dDate" class="input" type="date" value="' + esc(dy.date) + '" max="2026-09-01"></div>' +
+          '<p class="sub" style="margin-top:6px">' + esc(t('date_hint')) + '</p>' +
+
+          '<div class="bigamount" style="margin-top:14px"><div class="cur">' + esc(t('day_gross')) + '</div>' +
+            '<input id="dGross" class="amtin" inputmode="decimal" placeholder="0" value="' + esc(dy.gross) + '"></div>' +
+          '<div class="errmsg" id="dErr" hidden></div>' +
+
+          '<div class="cardhead" style="margin-top:14px"><div><h2>' + esc(t('car_expenses')) + '</h2>' +
+            '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
+          '<div class="stack">' + dy.rows.map((r, i) =>
+            '<div class="exprow" data-exprow><select class="input expLabel">' +
+              EXP_LABELS.map(l => '<option value="' + l + '"' + (r.label === l ? ' selected' : '') + '>' +
+                esc(t('e_' + l)) + '</option>').join('') + '</select>' +
+              '<span class="pill ' + (kindOf(r.label) === 'direct' ? 'member' : '') + '">' +
+                esc(t(kindOf(r.label))) + '</span>' +
+              '<input class="input expAmt" inputmode="decimal" placeholder="0" value="' + esc(r.amount) + '">' +
+              '<button class="btn ghost sm" data-action="delExp" data-i="' + i + '">×</button></div>').join('') +
+          '</div>' +
+          '<button class="btn ghost sm" style="margin-top:10px" data-action="addExp">+ ' + esc(t('add_expense_row')) + '</button>' +
+
+          '<div style="margin-top:18px" id="dayCalc"></div>' +
+          '<button class="btn" style="width:100%;margin-top:16px" data-action="saveDay">' + esc(t('submit_day')) + '</button>' +
+        '</div>' +
+        '<div class="card"><div class="cardhead"><div><h2>' + esc(t('recent_days')) + '</h2></div></div>' +
+          (mine.length ? '<div class="stack">' + mine.map(c =>
+            '<div class="rowline"><div class="m"><div class="n">' + esc(I.date(c.date, true)) + '</div>' +
+              '<div class="w">' + esc(t('day_gross')) + ' ' + money(c.gross) + '</div></div>' +
+              '<span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
+                esc(c.status === 'open' ? t('awaiting') : t('settled')) + '</span>' +
+              '<div class="amt plus">' + money(c.uncle) + '</div></div>').join('') + '</div>'
+            : '<div class="empty">' + esc(t('no_days')) + '</div>') + '</div></div>';
     },
     after: function (page) {
-      const g = page.querySelector('#cGross');
-      if (!g) return;
-      const open = D.settlements.filter(s => s.status === 'open')[0];
-      g.addEventListener('input', function () {
-        const gross = Math.max(0, parseFloat(this.value) || 0);
-        page.querySelector('#cCalc').innerHTML = carCalc(Object.assign({}, open, recompute(open, gross)));
+      previewDay();
+      page.addEventListener('input', previewDay);
+      page.addEventListener('change', function (e) {
+        if (e.target.classList.contains('expLabel')) {
+          state.day = readDayForm();
+          renderShell();
+        } else previewDay();
       });
     }
   };
 
-  function recompute(s, gross) {
-    const uncle = Math.round(gross / 3), pool = gross - uncle;
-    const profit = pool - s.spent, family = Math.round(profit * 0.75);
-    return { gross, uncle, pool, profit, family, marwa: profit - family };
-  }
+  SCREENS.myearnings = {
+    html: function () {
+      const mine = D.carDays.filter(c => c.submittedBy === state.user.id).sort(byDateDesc);
+      const settled = mine.filter(c => c.status === 'settled');
+      const total = settled.reduce((s, c) => s + c.uncle, 0);
+      const win = settled.filter(c => inWindow(c, 30));
+      const win30 = win.reduce((s, c) => s + c.uncle, 0);
+      const awaiting = mine.filter(c => c.status === 'open').reduce((s, c) => s + c.uncle, 0);
 
-  function carCalc(s) {
-    const row = (label, value, cls) =>
-      '<div class="calcrow ' + (cls || '') + '"><span class="l">' + esc(label) + '</span><b>' + money(value) + '</b></div>';
-    return row(t('uncle_share'), s.uncle, 'out') +
-           row(t('operating_pool'), s.pool) +
-           row(t('car_expenses'), s.spent, 'out') +
-           row(t('profit'), s.profit) +
-           '<div class="calcrow total in"><span class="l">' + esc(t('family_share')) + '</span><b>' + money(s.family) + '</b></div>' +
-           row(t('marwa_share'), s.marwa, 'out');
-  }
+      return '<p class="lead">' + esc(t('my_earnings_sub')) + '</p>' +
+        '<div class="grid k4">' +
+          '<div class="card hero kpi"><div class="k">' + esc(t('earned_total')) + '</div>' +
+            '<div class="v">' + money(total) + '</div>' +
+            '<div class="w">' + I.n(settled.length) + ' ' + esc(t('days_driven')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('earned_month')) + '</div>' +
+            '<div class="v plus">' + money(win30) + '</div>' +
+            '<div class="w">' + I.n(win.length) + ' ' + esc(t('days_driven')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('awaiting')) + '</div>' +
+            '<div class="v">' + money(awaiting) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('day_gross')) + ' · ' + esc(t('earned_month')) + '</div>' +
+            '<div class="v">' + money(win.reduce((s, c) => s + c.gross, 0)) + '</div></div>' +
+        '</div>' +
+        '<div class="card" style="margin-top:16px"><div class="tablewrap"><table><thead><tr>' +
+          '<th>' + esc(t('date')) + '</th><th class="num">' + esc(t('day_gross')) + '</th>' +
+          '<th>' + esc(t('car_expenses')) + '</th><th class="num">' + esc(t('net_after')) + '</th>' +
+          '<th class="num">' + esc(t('joe_share')) + '</th><th>' + esc(t('status')) + '</th></tr></thead><tbody>' +
+          mine.slice(0, 40).map(c => '<tr><td>' + esc(I.date(c.date, true)) + '</td>' +
+            '<td class="num">' + money(c.gross) + '</td>' +
+            '<td><span class="chips">' + expenseChips(c) + '</span></td>' +
+            '<td class="num">' + money(c.net) + '</td>' +
+            '<td class="num"><b>' + money(c.uncle) + '</b></td>' +
+            '<td><span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
+              esc(c.status === 'open' ? t('awaiting') : t('settled')) + '</span></td></tr>').join('') +
+        '</tbody></table></div></div>';
+    }
+  };
+
+  /* Approvals (decision D5) — Abdo decides on every member submission */
+  SCREENS.approvals = {
+    html: function () {
+      const pend = pendingTx().sort(byDateDesc);
+      const decided = D.memberTx.filter(m => m.status !== 'pending' && m.decidedBy)
+                                .sort(byDateDesc).slice(0, 10);
+      const rowFor = m =>
+        '<div class="rowline"><div class="dot" style="background:' + ccolor(m.cat) + '">' +
+            esc(cname(m.cat).slice(0, 2)) + '</div>' +
+          '<div class="m"><div class="n">' + esc(t(m.note)) + '</div>' +
+            '<div class="w"><span>' + esc(pname(m.person)) + '</span><span>' + esc(cname(m.cat)) +
+            '</span><span>' + esc(I.date(m.date, true)) + '</span></div></div>' +
+          '<div class="amt minus">−' + money(m.amount) + '</div>' +
+          '<button class="btn sm" data-action="approve" data-id="' + m.id + '">' + esc(t('approve')) + '</button>' +
+          '<button class="btn ghost sm" data-action="reject" data-id="' + m.id + '">' + esc(t('reject')) + '</button>' +
+        '</div>';
+
+      return '<p class="lead">' + esc(t('approvals_sub')) + '</p>' +
+        '<div class="grid k3">' +
+          '<div class="card hero kpi"><div class="k">' + esc(t('pending_total')) + '</div>' +
+            '<div class="v">' + I.n(pend.length) + '</div>' +
+            '<div class="w">' + money(sum(pend)) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('approved')) + '</div>' +
+            '<div class="v plus">' + I.n(D.memberTx.filter(m => m.status === 'approved').length) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('rejected')) + '</div>' +
+            '<div class="v">' + I.n(D.memberTx.filter(m => m.status === 'rejected').length) + '</div></div>' +
+        '</div>' +
+        '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('pending')) + '</h2></div></div>' +
+          (pend.length ? '<div class="stack">' + pend.map(rowFor).join('') + '</div>'
+                       : '<div class="empty">' + esc(t('nothing_pending')) + '</div>') + '</div>' +
+        (decided.length ? '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' +
+          esc(t('decided')) + '</h2></div></div><div class="stack">' + decided.map(m =>
+            '<div class="rowline"><div class="m"><div class="n">' + esc(t(m.note)) + '</div>' +
+              '<div class="w">' + esc(pname(m.person)) + ' · ' + esc(I.date(m.date, true)) + '</div></div>' +
+              statusPill(m.status) + '<div class="amt">−' + money(m.amount) + '</div></div>').join('') +
+          '</div></div>' : '');
+    }
+  };
 
   /* Loans */
   SCREENS.loans = {
@@ -825,7 +1070,9 @@
         '<div class="card"><div class="cardhead"><div><h2>' + esc(t('set_open')) + '</h2>' +
           '<div class="sub">' + esc(t('set_open_sub')) + '</div></div></div>' +
           '<div class="qlist">' + qs.map((q, i) =>
-            '<div class="qitem"><span class="no">' + (i + 1) + '</span><span>' + esc(t(q)) + '</span></div>').join('') + '</div></div>' +
+            '<div class="qitem"><span class="no">D' + (i + 1) + '</span>' +
+              '<span><span class="qq">' + esc(t(q)) + '</span>' +
+              '<span class="qa">' + esc(t('a' + (i + 1))) + '</span></span></div>').join('') + '</div></div>' +
         '<div>' +
           '<div class="card"><div class="cardhead"><div><h2>' + esc(t('set_cats')) + '</h2>' +
             '<div class="sub">' + esc(t('set_cats_sub')) + '</div></div></div>' +
@@ -834,7 +1081,7 @@
               hue(c) + ';margin-inline-end:6px"></i>' + esc(cname(c.id)) + '</span>').join('') + '</div></div>' +
           '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('set_fx')) + '</h2>' +
             '<div class="sub">' + esc(t('set_fx_sub')) + '</div></div></div>' +
-            '<div class="calcrow"><span class="l">1 SAR</span><b>' + I.n(D.RATES.SAR * 100) / 100 + ' ' + esc(t('egp')) + '</b></div>' +
+            '<div class="calcrow"><span class="l">1 SAR</span><b>' + D.RATES.SAR + ' ' + esc(t('egp')) + '</b></div>' +
             '<div class="calcrow"><span class="l">1 USD</span><b>' + D.RATES.USD + ' ' + esc(t('egp')) + '</b></div></div>' +
           '<div class="card" style="margin-top:16px"><div class="cardhead"><div><h2>' + esc(t('family_identity')) + '</h2></div></div>' +
             '<div class="idrow"><span class="l">' + esc(t('family_code')) + '</span><b class="mono">' + esc(D.FAMILY.code) + '</b></div>' +
@@ -888,8 +1135,10 @@
       const note = document.getElementById('fNote').value.trim();
 
       if (can.member()) {
+        // D5: a member's entry waits for Abdo; it does not move their balance yet.
         D.memberTx.push({ id: D.uid('mx'), person: state.user.id, cat: state.addCat,
-                          amount: Math.round(v), date, note: note || 'n_other_note' });
+                          amount: Math.round(v), date, note: note || 'n_other_note',
+                          status: 'pending', decidedBy: null });
       } else {
         const cur = state.addCurrency, fx = D.RATES[cur];
         D.add({ type: state.addType, cat: state.addCat, amount: Math.round(v * fx),
@@ -898,9 +1147,10 @@
                 note: note || 'n_other_note' });
       }
       state.addCat = null; state.addCurrency = 'EGP';
-      state.screen = can.member() ? 'myspending' : 'history';
+      const wasMember = can.member();
+      state.screen = wasMember ? 'myspending' : 'history';
       renderShell();
-      toast(t('saved'));
+      toast(wasMember ? t('member_pending_note') : t('saved'));
     },
 
     saveRem: function () {
@@ -923,14 +1173,52 @@
       renderShell(); toast(t('saved'));
     },
 
-    settle: function (el) {
-      const s = D.settlements.find(x => x.id === el.dataset.id);
-      const g = document.getElementById('cGross');
-      if (g) Object.assign(s, recompute(s, Math.max(0, parseFloat(g.value) || 0)));
-      s.status = 'settled';
-      D.add({ type:'income', cat:'carprofit', amount:s.family, date:D.TODAY, note:'n_car_share', src:s.id });
+    settleDay: function (el) {
+      const c = D.carDays.find(x => x.id === el.dataset.id);
+      if (!c || c.status === 'settled') return;
+      c.status = 'settled';
+      c.settledBy = state.user.id;
+      D.add({ type:'income', cat:'carprofit', amount:c.family, date:c.date, note:'n_car_share', src:c.id });
       renderShell(); toast(t('settled'));
     },
+
+    /* Joe's day submission */
+    addExp: function () {
+      state.day = readDayForm();
+      state.day.rows.push({ label:'fuel', amount:'' });
+      renderShell();
+    },
+    delExp: function (el) {
+      state.day = readDayForm();
+      state.day.rows.splice(+el.dataset.i, 1);
+      if (!state.day.rows.length) state.day.rows.push({ label:'fuel', amount:'' });
+      renderShell();
+    },
+    saveDay: function () {
+      const f = readDayForm();
+      const err = document.getElementById('dErr');
+      const gross = Math.max(0, parseFloat(f.gross) || 0);
+      const amtEl = document.getElementById('dGross');
+      err.hidden = true; amtEl.classList.remove('err');
+      if (!(gross > 0)) {
+        err.hidden = false; err.textContent = t('err_amount'); amtEl.classList.add('err');
+        return;
+      }
+      const items = f.rows.filter(r => (parseFloat(r.amount) || 0) > 0)
+        .map(r => ({ id: D.uid('ce'), label: r.label, amount: Math.round(parseFloat(r.amount)) }));
+      const date = parseDate(f.date);
+      D.carDays.push(Object.assign({
+        id: D.uid('cd'), date, gross, expenses: items,
+        status: 'open', submittedBy: state.user.id, settledBy: null
+      }, D.settleDay(gross, items)));
+      state.day = null;
+      state.screen = 'myearnings';
+      renderShell(); toast(t('day_saved'));
+    },
+
+    /* Abdo decides on a member submission */
+    approve: function (el) { decide(el.dataset.id, 'approved'); },
+    reject:  function (el) { decide(el.dataset.id, 'rejected'); },
 
     repay: function (el) {
       const l = D.loans.find(x => x.id === el.dataset.id);
@@ -945,6 +1233,15 @@
       renderShell(); toast(t('saved'));
     }
   };
+
+  function decide(id, status) {
+    const m = D.memberTx.find(x => x.id === id);
+    if (!m) return;
+    m.status = status;
+    m.decidedBy = state.user.id;
+    renderShell();
+    toast(t(status));
+  }
 
   function payOne(id) {
     const p = person(id);

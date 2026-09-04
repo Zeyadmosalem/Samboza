@@ -374,6 +374,26 @@ tfoot td { font-weight:750; border-block-start:1px solid var(--line); }
 .invite .c { font-size:22px; font-weight:800; letter-spacing:4px; color:var(--accent-text); }
 .invite .t { font-size:11.5px; color:var(--sub); margin-block-start:4px; }
 
+/* a count of things waiting on you, on its nav item */
+.navbadge {
+  margin-inline-start:auto; min-width:19px; height:19px; padding:0 5px; border-radius:10px;
+  background:var(--expense); color:#fff; font-size:10.5px; font-weight:800;
+  display:inline-flex; align-items:center; justify-content:center; line-height:1;
+}
+
+/* one expense line on Joe's day sheet: what it was, its class, how much */
+.exprow { display:flex; align-items:center; gap:8px; }
+.exprow .expLabel { flex:1.4; min-width:0; }
+.exprow .expAmt { flex:1; min-width:0; text-align:end; }
+.exprow .pill { flex:none; }
+.exprow .btn { flex:none; padding-inline:10px; }
+
+/* the big centred figure on the add-transaction and day sheets */
+.amtin {
+  border:0; outline:none; text-align:center; font-size:42px; font-weight:800;
+  letter-spacing:-1.5px; width:100%; background:transparent; color:var(--ink); padding:2px 0;
+}
+
 /* identifiers — always monospace, so a code reads as something to copy */
 .mono {
   font-family:ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -443,3 +463,8 @@ html[dir="rtl"] .viz-tip { direction:rtl; }
   .grid.k3, .grid.k2, .grid.k4 { grid-template-columns:1fr; }
   .who { grid-template-columns:1fr; }
 }
+
+/* a settled decision: the question, then what was agreed */
+.qitem .qq { display:block; font-weight:650; }
+.qitem .qa { display:block; color:var(--sub); font-size:12.5px; margin-block-start:2px; }
+.qitem .no { background:var(--accent-soft); color:var(--accent-text); }

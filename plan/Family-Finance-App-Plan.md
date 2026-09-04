@@ -20,6 +20,7 @@ A private ledger for one family. The mother earns abroad and sends money home; A
 | **Abdo** (big brother) | Accountant | **Admin** | Full access. Records and edits every transaction, manages categories, disburses allowances, registers loans, runs the car settlement, sets FX rates, approves member submissions. |
 | **Zeyad** (son) | Allowance recipient | **Member** | Submits his own expenses against his allowance; sees his own balance, history and spending-habit charts. No access to other members' detail. |
 | **Rewan** (daughter) | Allowance recipient | **Member** | Same as Zeyad. |
+| **Uncle Joe** | Maternal uncle — drives the family car for Uber | **Driver** | Submits each day he drives: the takings and what they cost. Sees his own days and his own earnings, and nothing of the family ledger. Cannot see or touch anyone else's money. |
 | *(future)* | — | any role | The role model must stay open: new members can be added without schema change. |
 
 ### 2.2 Non-user actors (appear in records, do not log in — for now)
@@ -29,14 +30,17 @@ A private ledger for one family. The mother earns abroad and sends money home; A
 | **Mona** | Aunt | Allowance recipient |
 | **Grandma** | Grandmother | Allowance recipient |
 | **Marwa** | Aunt | Allowance recipient **and** 25% share of car profit |
-| **Uncle** | Uber driver of the family car | Takes 1/3 of car gross income |
 | **Loaner** | External lender (name recorded per loan) | Loan counterparty |
 
 > Design rule: every actor is a `person` record. Whether they can log in is a separate flag. That way a beneficiary (Grandma, Mona) can be promoted to a user later without rewriting history.
 
 ### 2.3 Actor properties
 
-`id` (uuid), `family_id`, `member_no`, `display_name`, `relationship` (mother/brother/son/daughter/aunt/grandmother/cousins/uncle/external), `is_user` (can log in), `auth_user_id`, `role` (admin | member | viewer), `is_allowance_recipient`, `default_allowance_amount`, `active`, `joined_at`.
+`id` (uuid), `family_id`, `member_no`, `display_name`, `relationship` (mother/brother/son/daughter/aunt/grandmother/cousins/uncle_maternal/external), `is_user` (can log in), `auth_user_id`, `role` (admin | member | viewer | driver), `is_allowance_recipient`, `active`, `joined_at`.
+
+> **Relationship is not cosmetic.** Joe is the mother's brother, so he is a *maternal* uncle — `الخال` in Arabic, not `العم`. Mona and Marwa are maternal aunts (`الخالة`) for the same reason. Arabic has no single word for "uncle", so the field has to carry which side of the family a person is on; a generic value would produce wrong Arabic on every screen.
+
+> **The allowance amount is not a column on `people`.** It moves over time (§3.3), so it lives in its own effective-dated table.
 
 ### 2.4 Identity: family and member IDs
 
@@ -101,26 +105,43 @@ Each expense carries: amount, category, sub-label/tag (free tagging on top of th
 
 A recurring outflow to named recipients: **Zeyad, Rewan, Mona (aunt), Grandma, Marwa (aunt)**.
 
+- **The monthly figure is fixed but not frozen** (decision D3). It can be raised or lowered at any time. A change is *effective-dated* rather than written over the old value, so raising Zeyad from EGP 2,500 to 3,000 in June leaves March–May reading 2,500 for ever. The current amount is simply the latest rate whose `effective_from` has passed.
 - Each disbursement: recipient, amount, period (e.g. month), date paid, paid_by (Abdo), note.
 - Zeyad and Rewan then **log their own expenses against their allowance**, giving each of them a personal balance (allowance received − expenses logged) and spending-habit charts by category.
+- **Every submission needs Abdo's approval** (decision D5). A submitted expense sits as `pending`: the member can see it, but it does not move their balance until Abdo approves it. Rejecting it leaves the record and the reason, so nothing quietly disappears.
 - Mona, Grandma and Marwa currently receive allowance without submitting expenses — the disbursement itself is the end of the trail. If they become users later, the same expense-submission flow applies unchanged.
 
 ### 3.4 Car module (Uber)
 
-The family owns a car; the **uncle** drives it for Uber. Settlement rule:
+The family owns a car; **Uncle Joe** drives it for Uber. He is a user of the app, not just a name in a record — he submits his own days.
+
+**Settled daily** (decision D1). Joe records one submission per day he drives, and **picks the date himself**: there are days off, so the app never assumes the submission is for today. A day he did not drive is simply a day with no record.
+
+**Every expense is classified when he enters it** (decision D2):
+
+| Class | What it covers |
+|---|---|
+| **Direct** | Fuel, tolls — what it cost to earn that day's fares |
+| **Indirect** | Administration, the **kārta** permit, a traffic fine |
+
+**Both classes come off the takings before Joe's third.** The classification is what the family reports on; it does not change anyone's split.
 
 ```
-gross            = car income for the period
-uncle_share      = gross × 1/3            → paid to uncle
-operating_pool   = gross × 2/3            → covers car expenses
-profit           = operating_pool − car_expenses
-family_income    = profit × 0.75          → recorded as family income
-marwa_share      = profit × 0.25          → paid to Marwa
+gross            = the day's takings
+direct           = fuel, tolls
+indirect         = administration, kārta, fines
+net              = gross − direct − indirect
+joe_share        = net × 1/3            → paid to Joe
+remaining        = net − joe_share
+family_income    = remaining × 0.75     → recorded as family income
+marwa_share      = remaining × 0.25     → paid to Marwa
 ```
 
-Properties per settlement: period start/end, gross income, uncle share, itemised car expenses, computed profit, family share, Marwa share, status (open/settled), settled_by, notes. Individual trips/expenses roll up into the settlement; the app computes the splits rather than asking Abdo to do the arithmetic.
+> **This reverses the earlier draft**, which took Joe's third off the gross *before* any expense. Under the old rule Joe carried none of the running costs; under this one he shares every cost of the car, direct or indirect, before taking his cut. On a day taking EGP 840 with EGP 160 of fuel and an EGP 200 permit, Joe receives 160 rather than 280.
 
-**Needs a decision:** settlement period (daily / weekly / monthly), and what happens when `car_expenses > operating_pool` (negative profit — carry the deficit forward, or absorb it from family funds?).
+Properties per day: date, gross, itemised expenses each with its class, computed net, Joe's share, family share, Marwa's share, status (submitted / settled), submitted_by (Joe), settled_by (Abdo). Joe enters only the takings and the costs; the app does the arithmetic.
+
+**Still open:** what happens on a day where expenses exceed the takings — a large fine on a quiet day. The demo floors the net at zero, so nobody is paid rather than anybody owing money. Carrying the deficit into the next day is the alternative and needs a decision before build.
 
 ### 3.5 Loans
 
@@ -146,13 +167,15 @@ Properties: **lender name (required)**, **amount (required)**, description (opti
 - **Allowance disbursement**: pay recipients, track per-recipient balances
 - **Member expense submission**: Zeyad and Rewan log spending against their allowance
 - **Loan register**: lender, amount, optional description, repayments
-- **Car settlement**: enter gross + car expenses, app computes uncle / family / Marwa splits
+- **Car, settled daily**: Joe submits each day he drives — date, takings, and expenses classified direct or indirect; the app computes the net, his third, and the family / Marwa split (§3.4)
+- **Approval queue**: Zeyad's and Rewan's submissions wait for Abdo before they move a balance
 - **History**: grouped by day; filter by person, category, type, date range; search notes
 - **Dashboard**: cash on hand, current-period income vs expenses, days since last remittance, recent transactions
 - **Charts**: income vs expense by month (bar), spending by category (donut), 6-month trend (line), per-person comparison, per-member spending habits
 - Read-only auditor view for the mother
+- **English and Arabic from day one, with a full RTL layout** (decision D9) — not deferred to Phase 2
 - Multi-device realtime sync; offline entry that syncs when back online
-- Ledger currency: EGP
+- Ledger currency: EGP; **Gregorian dates only** (decision D9)
 
 ### Phase 2 — Quality of life
 - Monthly budgets per category with progress bars and alerts
@@ -160,7 +183,6 @@ Properties: **lender name (required)**, **amount (required)**, description (opti
 - Receipt photo attachments
 - CSV/Excel export
 - Push notifications (budget alerts, weekly family digest)
-- Arabic localization + RTL layout
 
 ### Phase 3 — Money transfer (future)
 - Internal wallet per member; member-to-member transfers recorded in a **double-entry ledger**
@@ -212,9 +234,20 @@ remittances       id, family_id, from_person (mother), amount_original, currency
                   fx_rate, amount_egp, received_on, visit_note
                   -- creates an income transaction
 
+allowance_rates   id, family_id, recipient_id, amount_egp, effective_from
+                  -- D3: effective-dated, never overwritten. The current
+                  -- amount is the latest row whose effective_from has passed
+
 allowances        id, family_id, recipient_id, period, amount_egp,
                   paid_on, paid_by, note
                   -- creates an expense transaction in category 'Allowance'
+
+member_expenses   id, family_id, person_id, category_id, amount_egp,
+                  occurred_at, description,
+                  status (pending|approved|rejected), decided_by, decided_at
+                  -- D5: a sub-ledger. Only approved rows move the member's
+                  -- balance; they never touch the family ledger, which
+                  -- already expensed the disbursement
 
 loans             id, family_id, direction (borrowed|lent), lender_name,
                   amount_original, currency, amount_egp, taken_on,
@@ -222,13 +255,17 @@ loans             id, family_id, direction (borrowed|lent), lender_name,
 
 loan_payments     id, loan_id, amount_egp, paid_on, note
 
-car_settlements   id, family_id, period_start, period_end, gross_egp,
-                  uncle_share_egp, operating_pool_egp, car_expenses_egp,
-                  profit_egp, family_share_egp, marwa_share_egp,
-                  status (open|settled), settled_by, note
+car_days          id, family_id, drive_date (unique per family), gross_egp,
+                  direct_egp, indirect_egp, net_egp, driver_share_egp,
+                  family_share_egp, marwa_share_egp,
+                  status (submitted|settled), submitted_by, settled_by, note
+                  -- D1: one row per day driven. drive_date is chosen by the
+                  -- driver, never defaulted to today: there are days off
 
-car_expenses      id, settlement_id, category (fuel|maintenance|licensing|other),
-                  amount_egp, occurred_at, description
+car_expenses      id, car_day_id, label (fuel|tolls|permit|admin|ticket),
+                  class (direct|indirect), amount_egp, description
+                  -- D2: class is chosen at entry and deducted before the
+                  -- driver's third; it is a reporting label, not a split
 
 budgets           id, family_id, category_id, month, limit_amount      -- Phase 2
 recurring_rules   id, family_id, template fields, schedule             -- Phase 2
@@ -275,14 +312,24 @@ See `Family-Finance-App-Mockups.html` for visuals.
 - Supabase free tier + web hosting free tier: **$0/month** to start
 - Google Play: $25 one-time · Apple: $99/year (or skip stores initially — use the web app + Android APK)
 
-## 10. Open Questions
+## 10. Decisions
 
-1. **Car settlement period** — daily, weekly or monthly? And if car expenses exceed the 2/3 operating pool, is the deficit carried forward or covered from family funds?
-2. **Uncle's third** — calculated on gross income before any expense, confirmed? Does he also pay for fuel out of his own share, or does all fuel come from the operating pool?
-3. **Allowance cadence** — monthly fixed amounts per recipient, or ad-hoc when the mother visits?
-4. **FX rate source** — manual entry by Abdo per remittance, or pulled from a rate API?
-5. **Do Zeyad and Rewan's submissions need Abdo's approval**, or do they post directly to the ledger?
-6. **Should Zeyad and Rewan see family totals** (rent, food, other people's allowances), or strictly their own numbers?
-7. **Gifts** — track the recipient of each gift as well as the amount?
-8. Track separate accounts (cash vs bank/wallet), or one pool?
-9. Hijri calendar display alongside Gregorian? Arabic UI from day one?
+Settled with the family on 4 September 2026. These were the nine open questions; each now has an answer, and each answer is built into the demo.
+
+| # | Question | Decision |
+|---|---|---|
+| **D1** | Car settlement period | **Daily.** Joe submits one record per day he drives and **picks the date himself** — there are days off, so the app never assumes today. |
+| **D2** | When is Joe's third taken? | **After expenses, not before.** Every cost comes off the day's takings first; Joe then takes a third of the net. He classifies each expense **direct** (fuel, tolls) or **indirect** (administration, the kārta permit, a fine) as he enters it — a reporting label, not a different split. *This reverses the original draft; see §3.4.* |
+| **D3** | Allowance cadence | **A fixed monthly amount per person, which can be raised or lowered over time.** Changes are effective-dated, so they never rewrite what was already paid. |
+| **D4** | FX rate source | **Abdo types it himself** per remittance. No rate API. The rate is stored with the record. |
+| **D5** | Do member submissions need approval? | **Yes.** Zeyad's and Rewan's expenses sit as `pending` and do not move their balance until Abdo approves. |
+| **D6** | Do members see family totals? | **No.** Strictly their own numbers. |
+| **D7** | Gifts | **Record the recipient**, with an optional note. |
+| **D8** | Cash vs bank/wallet | **One pot.** No account separation. |
+| **D9** | Calendar and language | **Gregorian dates only.** **English and Arabic from day one**, switchable in the UI as the demo does it — Arabic moves out of Phase 2 into Phase 1. |
+
+### Still open
+
+One question came out of D1 and D2 rather than being answered by them:
+
+- **A day where expenses exceed the takings** — a large fine on a quiet day. The demo floors the net at zero, so nobody is paid rather than anybody owing money. Carrying the deficit into the next day is the alternative. Needs a decision before build.
