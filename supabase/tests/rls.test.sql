@@ -8,7 +8,13 @@
 -- explicitly rather than assumed to follow from a policy that looks right.
 
 begin;
+
+-- The helpers are created as postgres but CALLED as authenticated, once
+-- tests.be() switches role. Without these grants every assertion dies on
+-- 'permission denied for schema tests' before it runs.
 create schema if not exists tests;
+grant usage on schema tests to public;
+
 select plan(28);
 
 -- ------------------------------------------------------------ fixtures
@@ -70,10 +76,15 @@ begin
                      json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
 end $$;
 
+-- NOT security definer: the dynamic query must run as the CURRENT role so
+-- that row-level security actually applies to it. That is the whole point.
 create or replace function tests.rows_in(p_sql text) returns bigint
 language plpgsql as $$
 declare n bigint;
 begin execute 'select count(*) from (' || p_sql || ') q' into n; return n; end $$;
+
+grant execute on function tests.be(uuid)      to public;
+grant execute on function tests.rows_in(text) to public;
 
 -- =====================================================================
 -- Zeyad — a member. Sees his own, and nothing else.
