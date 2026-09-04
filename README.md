@@ -134,11 +134,15 @@ family_income = remaining × 0.75
 marwa_share   = remaining × 0.25
 ```
 
-Both classes come off **before** Joe's third. The original draft took his third
-off the gross first, which meant he carried none of the car's running costs; the
-family reversed that. On a day taking EGP 840 with EGP 160 of fuel and an EGP 200
-permit, Joe receives 160 rather than 280. The direct/indirect label is what the
-family reports on — it does not change anyone's split.
+Both classes come off **before** Joe's third, so he shares every cost of the car.
+On a day taking EGP 840 with EGP 160 of fuel and an EGP 200 permit, Joe receives
+160. The direct/indirect label is what the family reports on — it does not change
+anyone's split.
+
+This is how the family has always run the car. An early draft of the plan
+recorded it as a third of the *gross*, which would have given him 280 and left
+him carrying none of the running costs; the document was corrected to match
+reality. There is no "old rule" period and no history to restate.
 
 ## Status
 

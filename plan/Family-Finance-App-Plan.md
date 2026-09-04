@@ -141,7 +141,9 @@ family_income    = remaining × 0.75     → recorded as family income
 marwa_share      = remaining × 0.25     → paid to Marwa
 ```
 
-> **This reverses the earlier draft**, which took Joe's third off the gross *before* any expense. Under the old rule Joe carried none of the running costs; under this one he shares every cost of the car, direct or indirect, before taking his cut. On a day taking EGP 840 with EGP 160 of fuel and an EGP 200 permit, Joe receives 160 rather than 280.
+> **This is how the family has always done it — §3.4 of the first draft of this document simply recorded it wrongly**, as a third of the *gross*, and the first demo inherited the error. Nothing about the arrangement changed; the write-up was corrected to match it. The distinction matters for anyone reading back: there is no "old rule" period, and historical records need no restatement.
+>
+> Joe shares every cost of the car, direct and indirect, before taking his cut. On a day taking EGP 840 with EGP 160 of fuel and an EGP 200 permit, he receives 160 — not the 280 the mistaken version produced.
 
 Properties per day: date, gross, itemised expenses each with its class, computed net, Joe's share, family share, Marwa's share, status (submitted / settled), submitted_by (Joe), settled_by (Abdo). Joe enters only the takings and the costs; the app does the arithmetic.
 
@@ -369,7 +371,7 @@ Settled with the family on 4 September 2026. These were the nine open questions;
 | # | Question | Decision |
 |---|---|---|
 | **D1** | Car settlement period | **Daily.** Joe submits one record per day he drives and **picks the date himself** — there are days off, so the app never assumes today. |
-| **D2** | When is Joe's third taken? | **After expenses, not before.** Every cost comes off the day's takings first; Joe then takes a third of the net. He classifies each expense **direct** (fuel, tolls) or **indirect** (administration, the kārta permit, a fine) as he enters it — a reporting label, not a different split. *This reverses the original draft; see §3.4.* |
+| **D2** | When is Joe's third taken? | **After expenses, not before.** Every cost comes off the day's takings first; Joe then takes a third of the net. He classifies each expense **direct** (fuel, tolls) or **indirect** (administration, the kārta permit, a fine) as he enters it — a reporting label, not a different split. *Always the arrangement; the first draft of §3.4 recorded it wrongly and was corrected.* |
 | **D3** | Allowance cadence | **A fixed monthly amount per person, which can be raised or lowered over time.** Changes are effective-dated, so they never rewrite what was already paid. |
 | **D4** | FX rate source | **Abdo types it himself** per remittance. No rate API. The rate is stored with the record. |
 | **D5** | Do member submissions need approval? | **Yes.** Zeyad's and Rewan's expenses sit as `pending` and do not move their balance until Abdo approves. |

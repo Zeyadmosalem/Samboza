@@ -3,7 +3,9 @@
 -- D1  Daily. Joe picks the date himself; the car does not run every day and
 --     today must never be assumed.
 -- D2  Every cost comes off the takings BEFORE Joe's third. He chooses the
---     class himself; the label only suggests one.
+--     class himself; the label only suggests one. This has always been the
+--     arrangement — an early draft of the plan wrote it up as a third of the
+--     gross, so there is no historical data computed the other way.
 -- D10 A day may be NEGATIVE and is not floored. A loss is shared in exactly
 --     the ratios a profit is.
 -- D11 Handovers are irregular. He records; Abdo confirms when the cash is
