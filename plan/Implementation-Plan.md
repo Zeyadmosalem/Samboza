@@ -235,6 +235,67 @@ month of parallel running reconciled exactly.
 
 ---
 
+## Phase 4 — Import the record (week 8)
+
+**After the app is live and running, before the phones.** That order is
+deliberate:
+
+- **After go-live**, because the import must land in the schema people are
+  actually using, with the constraints switched on. Importing into a schema
+  still being changed means importing twice.
+- **Before the phones**, because the family should be looking at their real
+  history when they first open it on a handset. An app full of their own past
+  is a different thing from an empty one.
+
+The record is an Excel sheet — the thing that prompted this project. It is not
+retyped; it is imported by a script in the repo, re-runnable, idempotent
+through `client_uuid` so a half-finished run can simply be run again.
+
+1. **Read the sheet and map it.** Its columns to categories, its people to
+   `people` rows, its dates to real dates. Written down before any code, because
+   the mapping is where the judgement is.
+2. **Pick a cut-over date.** Set an **opening balance** at it rather than
+   back-filling years. Import roughly 6–12 months behind it — enough for the
+   charts to show something true, not so much that you are reconciling 2023.
+3. **Dry run.** The importer reports what it *would* write and every row it
+   would reject, changing nothing.
+4. **Fix the sheet, not the importer.** Every rejection is a real error in the
+   record: a journal that does not balance, the same car day twice, a month's
+   allowance paid twice, a date that will not parse.
+5. **Import, then reconcile.** The closing balance must equal the sheet's, to
+   the piastre. If it does not, stop — do not adjust it to fit.
+
+> Importing into a constrained double-entry schema is the best audit that
+> spreadsheet will ever get. It will find things. That is the point, and it is
+> the reason this is its own phase rather than a footnote to go-live.
+
+Everything before the cut-over enters as **journals only** — the money
+movements. No historical row becomes a `car_day`, an `allowance` or a
+`member_expense`. Those tables then only ever hold rows produced by the current
+rules, and nothing old has to satisfy a constraint that post-dates it.
+
+Note there is no restatement problem: the car has always been split the way it
+is split now, so the sheet's figures stand as they are.
+
+---
+
+## Phase 5 — Phones (next sprint)
+
+Capacitor wraps the web app that is already live. The UI is not rewritten.
+
+```bash
+npm install @capacitor/core @capacitor/cli
+npx cap init && npx cap add ios && npx cap add android
+```
+
+- A PWA first: it installs to the home screen on both platforms and costs
+  nothing. Only go to the stores if something actually requires it —
+  Google Play $25 once, Apple $99/year.
+- Test the glass on a real mid-range Android before shipping. `backdrop-filter`
+  is where the frames go.
+
+---
+
 ## Maintenance
 
 | Cadence | Task |
