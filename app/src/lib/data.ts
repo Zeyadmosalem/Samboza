@@ -263,3 +263,118 @@ export const newClientUuid = () =>
     // Older WebViews. Not cryptographically strong, and does not need to be:
     // this is a collision guard, not a secret.
     `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-4000-8000-${Math.random().toString(16).slice(2, 14)}`)
+
+/* -------------------------------------------------------------- allowance */
+
+export interface MemberBalance {
+  family_id: string
+  person_id: string
+  received: number
+  approved: number
+  /** received − approved. Only meaningful for someone who submits at all. */
+  balance: number
+  pending: number
+  pending_count: number
+  last_period: string | null
+  rate: number | null
+}
+
+export interface AllowancePayment {
+  id: string
+  recipient_id: string
+  period: string
+  amount_egp: number
+  paid_on: string
+}
+
+export async function memberBalances(familyId: string) {
+  const { data, error } = await supabase
+    .from('member_balances')
+    .select('*')
+    .eq('family_id', familyId)
+  if (error) throw error
+  return (data ?? []) as MemberBalance[]
+}
+
+/** Every payment for one month. Absence is the answer to "has X been paid". */
+export async function allowancesFor(familyId: string, period: string) {
+  const { data, error } = await supabase
+    .from('allowances')
+    .select('id,recipient_id,period,amount_egp,paid_on')
+    .eq('family_id', familyId)
+    .eq('period', period)
+  if (error) throw error
+  return (data ?? []) as AllowancePayment[]
+}
+
+export async function payAllowance(args: {
+  familyId: string
+  recipientId: string
+  period: string
+  paidOn: string
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('pay_allowance', {
+    p_family: args.familyId,
+    p_recipient: args.recipientId,
+    p_period: args.period,
+    p_paid_on: args.paidOn,
+    p_amount: null,          // whatever the rate for that month says
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function setAllowanceRate(args: {
+  familyId: string
+  recipientId: string
+  amount: number
+  effectiveFrom: string
+}) {
+  const { error } = await supabase.rpc('set_allowance_rate', {
+    p_family: args.familyId,
+    p_recipient: args.recipientId,
+    p_amount: args.amount,
+    p_effective_from: args.effectiveFrom,
+  })
+  if (error) throw error
+}
+
+/** The 1st of the month `iso` falls in, and the 1st of the one after. */
+export const periodOf = (iso: string) => iso.slice(0, 7) + '-01'
+export function nextMonthStart(iso: string) {
+  const [y, m] = iso.split('-').map(Number)
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+}
+export const monthLabel = (iso: string, lang: 'en' | 'ar') => {
+  const [y, m] = iso.split('-').map(Number)
+  return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB',
+    { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1))
+}
+
+/* ------------------------------------------------------------- approvals */
+
+export async function pendingSubmissions(familyId: string) {
+  const { data, error } = await supabase
+    .from('member_expenses')
+    .select('id,person_id,category_id,amount_egp,occurred_on,description,status,reason,created_at')
+    .eq('family_id', familyId)
+    .eq('status', 'pending')
+    .order('occurred_on', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as MemberExpense[]
+}
+
+/**
+ * Guarded on the CURRENT status inside the function, so two admins deciding
+ * the same row cannot both succeed. `false` means somebody got there first —
+ * not an error, and the screen should reload rather than complain.
+ */
+export async function decideSubmission(id: string, status: 'approved' | 'rejected', reason?: string) {
+  const { data, error } = await supabase.rpc('decide_member_expense', {
+    p_id: id, p_status: status, p_reason: reason || null,
+  })
+  if (error) throw error
+  return data as boolean
+}

@@ -178,6 +178,113 @@ check('Add Transaction: a member submits, and it lands pending',
   await admin.from('car_days').delete().eq('id', loss.data?.id ?? '')
 }
 
+/* --------------------------------------------------------- the allowance */
+{
+  const period = MONTH
+  const before = await abdo.from('member_balances').select('*').eq('person_id', P.Zeyad.id).single()
+
+  const paid = await abdo.rpc('pay_allowance', {
+    p_family: fam.id, p_recipient: P.Zeyad.id, p_period: period,
+    p_paid_on: TODAY, p_amount: null, p_client_uuid: randomUUID(),
+  })
+  check('Allowance: the admin pays a month', !paid.error && !!paid.data,
+    paid.error?.message ?? '')
+
+  const twice = await abdo.rpc('pay_allowance', {
+    p_family: fam.id, p_recipient: P.Zeyad.id, p_period: period,
+    p_paid_on: TODAY, p_amount: null, p_client_uuid: randomUUID(),
+  })
+  check('…and cannot pay the same month twice',
+    /already been paid/.test(twice.error?.message ?? ''),
+    twice.error?.message ?? '*** paid the same month twice ***')
+
+  const after = await abdo.from('member_balances').select('*').eq('person_id', P.Zeyad.id).single()
+  const rate = before.data?.rate ?? 0
+  check('…and the balance moves by exactly the rate',
+    after.data.received - (before.data?.received ?? 0) === rate &&
+    after.data.balance - (before.data?.balance ?? 0) === rate,
+    `received ${before.data?.received} → ${after.data.received} (rate ${rate})`)
+
+  // The disbursement is a family expense: it must appear in the ledger, and
+  // NOT in the member sub-ledger, or the same money is counted twice.
+  const feed = await abdo.from('ledger_feed').select('*')
+    .eq('person_id', P.Zeyad.id).gte('occurred_on', period)
+  check('…and it posts to the family ledger as an expense',
+    feed.data?.some(r => r.account_kind === 'expense' && r.amount === rate),
+    feed.data?.map(r => `${r.category_en} ${r.signed_amount}`).join(', ') || 'no rows')
+
+  const member = await zeyad.from('member_balances').select('*')
+  check('member_balances shows a member ONE row — their own',
+    !member.error && member.data.length === 1 && member.data[0].person_id === P.Zeyad.id,
+    `${member.data?.length} rows`)
+
+  const joeSees = await joe.from('member_balances').select('*')
+  check('…and shows the driver none', !joeSees.error && joeSees.data.length === 0,
+    `${joeSees.data?.length} rows`)
+
+  const memberPays = await zeyad.rpc('pay_allowance', {
+    p_family: fam.id, p_recipient: P.Zeyad.id, p_period: '2020-01-01',
+    p_paid_on: TODAY, p_amount: null, p_client_uuid: randomUUID(),
+  })
+  check('…and a member cannot pay himself', memberPays.error?.code === '42501',
+    memberPays.error?.message ?? '*** a member paid himself ***')
+
+  // Effective dating (D3): a raise from next month must leave this month alone.
+  const nextM = addMonths(period, 1)
+  const raise = await abdo.rpc('set_allowance_rate', {
+    p_family: fam.id, p_recipient: P.Zeyad.id,
+    p_amount: rate + 50000, p_effective_from: nextM,
+  })
+  const stillNow = await abdo.from('allowance_rates').select('amount_egp,effective_from')
+    .eq('recipient_id', P.Zeyad.id).lte('effective_from', TODAY)
+    .order('effective_from', { ascending: false }).limit(1)
+  check('Allowance: a raise from next month leaves this month untouched',
+    !raise.error && stillNow.data[0].amount_egp === rate,
+    `today still reads ${stillNow.data?.[0]?.amount_egp}, raise lands ${nextM}`)
+  await admin.from('allowance_rates').delete()
+    .eq('recipient_id', P.Zeyad.id).eq('effective_from', nextM)
+}
+
+/* ---------------------------------------------------------- the approvals */
+{
+  const sub = await zeyad.from('member_expenses').insert({
+    family_id: fam.id, person_id: P.Zeyad.id, category_id: expenseCat.id,
+    amount_egp: 7700, occurred_on: TODAY, description: 'SCREEN CHECK approve me',
+    client_uuid: randomUUID(),
+  }).select().single()
+
+  const queue = await abdo.from('member_expenses').select('*')
+    .eq('family_id', fam.id).eq('status', 'pending')
+  check('Approvals: the queue is visible to the admin',
+    !queue.error && queue.data.some(r => r.id === sub.data.id),
+    `${queue.data?.length} pending`)
+
+  const selfApprove = await zeyad.rpc('decide_member_expense',
+    { p_id: sub.data.id, p_status: 'approved' })
+  check('…and a member cannot approve his own', selfApprove.error?.code === '42501',
+    selfApprove.error?.message ?? '*** approved his own ***')
+
+  const beforeBal = await abdo.from('member_balances').select('approved,pending')
+    .eq('person_id', P.Zeyad.id).single()
+  const ok = await abdo.rpc('decide_member_expense',
+    { p_id: sub.data.id, p_status: 'approved' })
+  const afterBal = await abdo.from('member_balances').select('approved,pending')
+    .eq('person_id', P.Zeyad.id).single()
+  check('…the admin approves it, and only then does the balance move',
+    ok.data === true &&
+    afterBal.data.approved - beforeBal.data.approved === 7700 &&
+    beforeBal.data.pending - afterBal.data.pending === 7700,
+    `approved ${beforeBal.data?.approved} → ${afterBal.data?.approved}, ` +
+    `pending ${beforeBal.data?.pending} → ${afterBal.data?.pending}`)
+
+  // Guarded on the CURRENT status inside the function: the second admin to
+  // press the button gets `false`, not a duplicate decision.
+  const again = await abdo.rpc('decide_member_expense',
+    { p_id: sub.data.id, p_status: 'rejected' })
+  check('…and deciding it twice returns false rather than deciding it twice',
+    again.data === false && !again.error, `returned ${JSON.stringify(again.data)}`)
+}
+
 /* ------------------------------------------------------ History paginates */
 {
   const one = await abdo.from('ledger_feed').select('*').eq('family_id', fam.id)
@@ -191,6 +298,14 @@ check('Add Transaction: a member submits, and it lands pending',
 
 /* ------------------------------------------------------------- cleanup -- */
 await admin.from('member_expenses').delete().like('description', 'SCREEN CHECK%')
+{
+  const { data: al } = await admin.from('allowances').select('id,journal_id')
+  for (const a of al ?? []) {
+    await admin.from('allowances').delete().eq('id', a.id)
+    await admin.from('entries').delete().eq('journal_id', a.journal_id)
+    await admin.from('journals').delete().eq('id', a.journal_id)
+  }
+}
 for (const memo of ['SCREEN CHECK groceries', 'SCREEN CHECK income']) {
   const { data: js } = await admin.from('journals').select('id').eq('memo', memo)
   for (const j of js ?? []) {
@@ -199,6 +314,12 @@ for (const memo of ['SCREEN CHECK groceries', 'SCREEN CHECK income']) {
   }
 }
 await finish(admin)
+
+function addMonths(iso, n) {
+  const [y, m] = iso.split('-').map(Number)
+  const d = new Date(y, m - 1 + n, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
 
 function addDays(iso, n) {
   const [y, m, d] = iso.split('-').map(Number)

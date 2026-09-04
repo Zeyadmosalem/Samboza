@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(39);
+select plan(50);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -44,11 +44,18 @@ insert into accounts (id, family_id, kind, name, system_key) values
   ('cccc0000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001','asset','Cash','cash'),
   ('cccc0000-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001','income','Car income','car_income'),
   ('cccc0000-0000-4000-8000-000000000003','aaaaaaaa-0000-4000-8000-000000000001','asset','Due from driver','due_from_driver'),
+  ('cccc0000-0000-4000-8000-000000000005','aaaaaaaa-0000-4000-8000-000000000001','expense','Allowance','cat:allowance'),
   -- The OTHER family's cash. Nothing in Samboza may ever post to it.
   ('cccc0000-0000-4000-8000-000000000004','aaaaaaaa-0000-4000-8000-000000000002','asset','Their cash','cash');
 
 insert into categories (id, family_id, name_en, name_ar, kind, account_id) values
   ('dddd0000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001','Food','الأكل','expense','cccc0000-0000-4000-8000-000000000002');
+
+-- `purpose` is how pay_allowance finds this one. Not the name: the family
+-- reads half the app in Arabic, and a category can be renamed.
+insert into categories (id, family_id, name_en, name_ar, kind, account_id, purpose) values
+  ('dddd0000-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001',
+   'Allowance','المصروف','expense','cccc0000-0000-4000-8000-000000000005','allowance');
 
 insert into journals (id, family_id, occurred_on, recorded_by, memo) values
   ('eeee0000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001', current_date,
@@ -265,6 +272,77 @@ select lives_ok(
   $$select confirm_handover('aaaaaaaa-0000-4000-8000-000000000001',
       array['99990000-0000-4000-8000-000000000001']::uuid[], current_date, 37000)$$,
   'the admin confirms a handover without naming the accounts');
+
+-- =====================================================================
+-- 0010 — the allowance: effective-dated, paid once, and what is left.
+-- =====================================================================
+select lives_ok(
+  $$select set_allowance_rate('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000003', 300000, '2026-01-01')$$,
+  'the admin sets Zeyad''s allowance');
+
+select lives_ok(
+  $$select set_allowance_rate('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000003', 400000, '2026-06-01')$$,
+  'and raises it from June');
+
+-- D3, and the whole reason rates are a table rather than a column: raising
+-- Zeyad in June must not change what March was worth.
+select is(allowance_rate_on('bbbb0000-0000-4000-8000-000000000003', '2026-03-15'),
+  300000::bigint, 'March still reads 3,000 after a June raise');
+
+select is(allowance_rate_on('bbbb0000-0000-4000-8000-000000000003', '2026-07-15'),
+  400000::bigint, 'July reads 4,000');
+
+select lives_ok(
+  $$select pay_allowance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000003', '2026-03-01', current_date)$$,
+  'the admin pays March');
+
+-- Paid at MARCH's rate, not at today's. Backdating a payment must not
+-- silently apply a raise that had not happened yet.
+select is(
+  (select amount_egp from allowances
+    where recipient_id = 'bbbb0000-0000-4000-8000-000000000003'
+      and period = '2026-03-01'),
+  300000::bigint, 'March was paid at March''s rate, not at today''s');
+
+select throws_ok(
+  $$select pay_allowance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000003', '2026-03-01', current_date)$$,
+  -- P0001 is a plain RAISE with no errcode of its own. Spelled out rather
+  -- than passed as NULL, which leaves pgTAP unable to pick an overload.
+  'P0001', null, 'a month cannot be paid twice');
+
+-- 0011: the rate is read at the END of the period. A rate set part way
+-- through a month covers that month — the family's own rates were set on the
+-- 4th, and asking for the 1st made September unpayable for six people who
+-- visibly had an allowance on screen.
+select lives_ok(
+  $$select set_allowance_rate('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000004', 250000, '2026-04-14')$$,
+  'the admin sets Rewan''s allowance mid-month');
+
+select lives_ok(
+  $$select pay_allowance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000004', '2026-04-01', current_date)$$,
+  'a rate dated the 14th still pays that whole month');
+
+-- The hole 0010's trigger closes: rates_write checks that the caller is this
+-- family's admin and never checked that the recipient is in it.
+select throws_ok(
+  $$insert into allowance_rates (family_id, recipient_id, amount_egp, effective_from, set_by)
+    values ('aaaaaaaa-0000-4000-8000-000000000001',
+            'bbbb0000-0000-4000-8000-000000000006', 999, '2026-01-01',
+            'bbbb0000-0000-4000-8000-000000000001')$$,
+  '42501', null, 'the admin cannot set a rate for another family''s person');
+
+-- security_invoker again: the balances view must scope to the reader.
+select tests.be('33333333-3333-4333-8333-333333333333');
+select is(tests.rows_in('select 1 from member_balances'), 1::bigint,
+  'a member sees ONE row in member_balances — his own');
+
+select tests.be('11111111-1111-4111-8111-111111111111');
 
 -- =====================================================================
 -- Cross-tenant. The whole multi-family promise rests on these two.

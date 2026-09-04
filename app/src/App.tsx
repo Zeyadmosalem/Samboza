@@ -7,13 +7,19 @@ import Placeholder from './screens/Placeholder'
 import Dashboard from './screens/Dashboard'
 import AddTransaction from './screens/AddTransaction'
 import History from './screens/History'
+import Allowance from './screens/Allowance'
+import MySpending from './screens/MySpending'
+import Approvals from './screens/Approvals'
 
-/** Phase 2 step 1 — the ledger and History — is real. The rest still hang
- *  from the shell as placeholders, in the order the plan builds them. */
+/** Steps 1–3 of Phase 2 are real. The rest still hang from the shell as
+ *  placeholders, in the order the plan builds them. */
 const BUILT: Record<string, () => JSX.Element> = {
   dashboard: Dashboard,
   add: AddTransaction,
   history: History,
+  allowance: Allowance,
+  myspending: MySpending,
+  approvals: Approvals,
 }
 
 const SCREENS = [

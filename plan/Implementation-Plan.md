@@ -162,9 +162,24 @@ Build in this order. Each step is demoable to the family on its own.
      be shown to a disconnected admin, which is why the loader distinguishes
      failed from empty.
 2. **Allowances** — effective-dated rates, disbursement, per-person balances.
+   **DONE.** Two things the schema had not settled, settled by building it:
+
+   - **Which rate a month is paid at.** The first attempt asked for the rate in
+     force on the 1st. The family's rates were set on the 4th of September, so
+     September had no rate and paying it failed for six people who visibly had
+     one on screen. The rule is now the rate in force at the END of the period:
+     a rate set mid-month covers that month, a raise dated later does not, and
+     paying March in June still pays March's rate. (0011)
+   - **Pending is shown beside the balance, never inside it.** Subtracting a
+     submission nobody has decided tells a member they have less than they
+     have; ignoring it lets them spend the same money twice. Both numbers, or
+     neither is honest.
+
 3. **Member submissions + approvals** — pending until Abdo decides.
-   *Ship the notification with it.* Without a nudge the queue silently rots and
-   the members' balances are quietly wrong.
+   **Approvals DONE**, brought forward because step 1 shipped the submitting
+   half and left the queue with no way to be decided. *The notification is
+   still outstanding* — without a nudge the queue silently rots and the
+   members' balances are quietly wrong.
 4. **The car** — Joe's daily submission, worked days *and recorded days off*,
    the direct/indirect class he chooses himself, the split (which may be
    negative), and **handovers**: Joe records days, Abdo confirms receipt when the

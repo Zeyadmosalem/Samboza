@@ -99,6 +99,40 @@ for (const person of PEOPLE) {
          : 'page was: ' + (await page.text('.page'))?.slice(0, 160))
   }
 
+  // Allowance: Abdo can pay, Ghada sees the same figures with no buttons.
+  if (seen.nav.includes('/allowance')) {
+    await page.click('a[href="/allowance"]')
+    const ok = await page.wait(`document.querySelectorAll('.rows .row').length > 0`)
+    const view = await page.ev(`({
+      people: document.querySelectorAll('.rows .row').length,
+      pay: [...document.querySelectorAll('.btn')].filter(b => /Pay|اصرف/.test(b.textContent)).length,
+    })`)
+    check(`${person.who}: Allowance lists the recipients`, ok, `${view.people} people`)
+    // Ghada watches and changes nothing. The database refuses her either way.
+    check(`${person.who}: only the admin is offered a Pay button`,
+      person.role === 'Admin' ? view.pay > 0 : view.pay === 0,
+      `${view.pay} pay buttons`)
+  }
+
+  if (seen.nav.includes('/myspending')) {
+    await page.click('a[href="/myspending"]')
+    // Settled figures, not the muted dashes they show while loading.
+    const ok = await page.wait(
+      `document.querySelectorAll('.kpi').length === 4 && !document.querySelector('.kpi .v.muted')`)
+    check(`${person.who}: My Spending shows a balance`, ok,
+      (await page.text('.kpis'))?.split('\n').join(' · ').slice(0, 120))
+  }
+
+  if (seen.nav.includes('/approvals')) {
+    await page.click('a[href="/approvals"]')
+    // Settled: either rows to decide, or the sentence saying there are none.
+    // Waiting on the heading alone would only prove the heading is a heading.
+    const ok = await page.wait(`document.querySelectorAll('.rows .row').length > 0 ||
+      /Nothing waiting|مافيش حاجة مستنية/.test(document.querySelector('.page')?.innerText ?? '')`)
+    check(`${person.who}: Approvals renders the queue`, ok,
+      (await page.text('.page'))?.split('\n').join(' · ').slice(0, 110))
+  }
+
   // Typing a URL the role has no business on. The nav hides it and the
   // database refuses it; neither should end in a blank screen.
   await page.go(APP + 'approvals')
