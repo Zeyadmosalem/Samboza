@@ -109,12 +109,15 @@ window.DEMO = (function () {
     { person:'marwa',    amount:2000, from:d(1,1) },
     { person:'adamanas', amount:2000, from:d(8,1) }    // joined in August
   ];
+  /* The rate in force on a date is the LATEST one whose effective_from has
+     passed — by date, never by row order. In SQL: ORDER BY effective_from
+     DESC LIMIT 1. Scanning in array order silently returns the wrong figure
+     the moment a backdated rate is inserted. */
   function rateOn(personId, when) {
-    let found = 0;
-    allowanceRates.forEach(function (r) {
-      if (r.person === personId && r.from <= when && r.amount != null) found = r.amount;
-    });
-    return found;
+    const applicable = allowanceRates
+      .filter(r => r.person === personId && r.amount != null && r.from <= when)
+      .sort((a, b) => a.from - b.from);
+    return applicable.length ? applicable[applicable.length - 1].amount : 0;
   }
   const currentRate = id => rateOn(id, TODAY);
   people.forEach(function (p) { p.allowance = currentRate(p.id); });
@@ -201,22 +204,48 @@ window.DEMO = (function () {
   const EXPENSE_LABELS = Object.keys(DEFAULT_KIND);
   const kindOf = e => e.kind || DEFAULT_KIND[e.label] || 'direct';
 
+  /* Amounts are whole piastres in the real schema; here they are whole EGP.
+     Never a float. The split is computed so the parts always sum exactly to
+     the net: Joe rounds, the family rounds, and Marwa takes the remainder —
+     she absorbs the odd piastre. That rule is a decision, so it is written
+     down rather than left to emerge from the arithmetic.
+
+     A day where costs exceed takings does NOT floor silently: `shortfall`
+     carries the amount the family is out of pocket, so the money is still
+     accounted for instead of vanishing. */
   function settleDay(gross, items) {
     const of = k => items.filter(e => kindOf(e) === k)
                          .reduce((s, e) => s + e.amount, 0);
     const direct = of('direct'), indirect = of('indirect');
-    const net    = Math.max(0, gross - direct - indirect);
+    const raw       = gross - direct - indirect;
+    const shortfall = raw < 0 ? -raw : 0;
+    const net       = Math.max(0, raw);
     const uncle  = Math.round(net / 3);
     const rest   = net - uncle;
     const family = Math.round(rest * 0.75);
-    return { direct, indirect, net, uncle, rest, family, marwa: rest - family };
+    return { direct, indirect, net, shortfall, uncle, rest, family, marwa: rest - family };
+  }
+
+  /* The car does not run every day. A day off is RECORDED, not merely
+     absent — otherwise "Joe rested" and "Joe has not submitted yet" look
+     identical, and the family cannot tell which. */
+  function dayOff(date, by) {
+    return { id: uid('cd'), date, gross: 0, expenses: [], worked: false,
+             direct: 0, indirect: 0, net: 0, shortfall: 0,
+             uncle: 0, rest: 0, family: 0, marwa: 0,
+             status: 'settled', submittedBy: by, settledBy: null };
+  }
+
+  /* One row per calendar day, at most (UNIQUE(family_id, drive_date)). */
+  function dayTaken(date) {
+    return carDays.some(c => c.date.toDateString() === date.toDateString());
   }
 
   const carDays = [];
   for (let m = 3; m <= 9; m++) {
     const lastDay = m === 9 ? 1 : new Date(2026, m, 0).getDate();
     for (let day = 1; day <= lastDay; day++) {
-      if (m !== 9 && rand() < 0.17) continue;                 // a day off
+      if (m !== 9 && rand() < 0.17) { carDays.push(dayOff(d(m, day), 'uncle')); continue; }
       const gross = 520 + Math.round(rand() * 460);
       const exp = (label, amount, note) => ({
         id: uid('ce'), label, amount, kind: DEFAULT_KIND[label], note: note || null
@@ -229,12 +258,12 @@ window.DEMO = (function () {
       if (rand() < 0.04) items.push(exp('other',  40 + Math.round(rand() * 90), 'n_carwash'));
       const open = (m === 9);                                 // today is still open
       carDays.push(Object.assign({
-        id: uid('cd'), date: d(m, day), gross, expenses: items,
+        id: uid('cd'), date: d(m, day), gross, expenses: items, worked: true,
         status: open ? 'open' : 'settled', submittedBy: 'uncle', settledBy: open ? null : 'abdo'
       }, settleDay(gross, items)));
     }
   }
-  carDays.filter(c => c.status === 'settled').forEach(function (c) {
+  carDays.filter(c => c.status === 'settled' && c.worked).forEach(function (c) {
     add({ type:'income', cat:'carprofit', amount:c.family, date:c.date, note:'n_car_share', src:c.id });
   });
 
@@ -287,6 +316,7 @@ window.DEMO = (function () {
   });
 
   return { TODAY, RATES, FAMILY, people, categories, tx, remittances, carDays,
-           DEFAULT_KIND, EXPENSE_LABELS, kindOf, settleDay, loans, allowances, allowanceRates, rateOn,
+           DEFAULT_KIND, EXPENSE_LABELS, kindOf, settleDay, dayOff, dayTaken,
+           loans, allowances, allowanceRates, rateOn,
            memberTx, add, uid };
 })();

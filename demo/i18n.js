@@ -141,6 +141,16 @@ window.I18N = (function () {
     allow_rate_note:'A fixed monthly amount per person that can be raised or lowered. A change is dated, so it never rewrites what was already paid.',
     rate_since:'Since {d}',
 
+    /* history sources + validation + days off */
+    src_ledger:'Family ledger', src_member:'Member spending', src_car:'Car day',
+    worked_day:'Worked', day_off:'Day off', days_off:'Days off',
+    submit_day_off:'Record a day off',
+    day_off_note:'No takings and no costs — just the date. Recording it means the family can tell a rest day from a day you have not sent in yet.',
+    day_off_saved:'Day off recorded',
+    err_date:'Pick a valid date', err_future:'That day has not happened yet',
+    err_dup_day:'That day is already recorded', already_settled:'Already settled',
+    off:'Off', not_submitted:'Not submitted',
+
     /* settings */
     set_title:'Settings', set_cats:'Categories', set_cats_sub:'Abdo can add to the default set.',
     set_fx:'Exchange rates', set_fx_sub:'Entered per remittance and stored with the record.',
@@ -310,6 +320,16 @@ window.I18N = (function () {
     /* allowance rates */
     allow_rate_note:'مبلغ شهري ثابت لكل شخص، يقدر يزيد أو يقل. أي تغيير بيتسجل بتاريخه، فمش بيغيّر اللي اتصرف قبل كده.',
     rate_since:'من {d}',
+
+    /* history sources + validation + days off */
+    src_ledger:'دفتر العائلة', src_member:'مصروفات الأعضاء', src_car:'يوم سيارة',
+    worked_day:'اشتغلت', day_off:'يوم راحة', days_off:'أيام الراحة',
+    submit_day_off:'تسجيل يوم راحة',
+    day_off_note:'مفيش إيراد ولا مصاريف — التاريخ بس. لما تسجله العائلة تعرف تفرق بين يوم راحة ويوم لسه مبعتوش.',
+    day_off_saved:'تم تسجيل يوم الراحة',
+    err_date:'اختر تاريخ صحيح', err_future:'اليوم ده لسه مجاش',
+    err_dup_day:'اليوم ده متسجل بالفعل', already_settled:'تمت تسويته بالفعل',
+    off:'راحة', not_submitted:'لم يُسجَّل',
 
     /* settings */
     set_title:'الإعدادات', set_cats:'التصنيفات', set_cats_sub:'عبده يقدر يضيف على المجموعة الافتراضية.',

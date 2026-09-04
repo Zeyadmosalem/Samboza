@@ -12,7 +12,7 @@
     addType: 'expense',
     addCat: null,
     addCurrency: 'EGP',
-    filters: { q: '', type: 'all', cat: 'all', person: 'all' },
+    filters: { q: '', type: 'all', cat: 'all', person: 'all', src: 'all' },
     tables: {},
     day: null            // Joe's in-progress day submission
 
@@ -732,19 +732,28 @@
       const dy = state.day;
       const mine = D.carDays.filter(c => c.submittedBy === state.user.id).sort(byDateDesc).slice(0, 6);
 
-      return '<p class="lead">' + esc(t('carday_sub')) + '</p>' +
+      const off = !!state.dayOff;
+      return '<p class="lead">' + esc(off ? t('day_off_note') : t('carday_sub')) + '</p>' +
         '<div class="grid split"><div class="card">' +
+          '<div class="seg" style="margin-bottom:14px">' +
+            '<button data-action="dayMode" data-v="worked" class="' + (off ? '' : 'on') + '">' + esc(t('worked_day')) + '</button>' +
+            '<button data-action="dayMode" data-v="off" class="' + (off ? 'on' : '') + '">' + esc(t('day_off')) + '</button>' +
+          '</div>' +
           '<div class="field"><label>' + esc(t('date_of_day')) + '</label>' +
             '<input id="dDate" class="input" type="date" value="' + esc(dy.date) + '" max="2026-09-01"></div>' +
           '<p class="sub" style="margin-top:6px">' + esc(t('date_hint')) + '</p>' +
 
-          '<div class="bigamount" style="margin-top:14px"><div class="cur">' + esc(t('day_gross')) + '</div>' +
-            '<input id="dGross" class="amtin" inputmode="decimal" placeholder="0" value="' + esc(dy.gross) + '"></div>' +
           '<div class="errmsg" id="dErr" hidden></div>' +
+          (off
+            ? '<p class="sub" style="margin-top:14px">' + esc(t('day_off_note')) + '</p>' +
+              '<input id="dGross" type="hidden" value="0">'
+            : '<div class="bigamount" style="margin-top:14px"><div class="cur">' + esc(t('day_gross')) + '</div>' +
+                '<input id="dGross" class="amtin" inputmode="decimal" placeholder="0" value="' + esc(dy.gross) + '"></div>') +
 
+          (off ? '' :
           '<div class="cardhead" style="margin-top:14px"><div><h2>' + esc(t('car_expenses')) + '</h2>' +
-            '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
-          '<div class="stack">' + dy.rows.map((r, i) =>
+            '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>') +
+          (off ? '' : '<div class="stack">' + dy.rows.map((r, i) =>
             '<div class="exprow" data-exprow>' +
               '<div class="exprow-top">' +
                 '<select class="input expLabel">' +
@@ -758,19 +767,19 @@
               '</div>' +
               '<input class="input expNote" placeholder="' + esc(t('exp_note_ph')) + '" value="' + esc(r.note || '') + '">' +
             '</div>').join('') +
-          '</div>' +
-          '<button class="btn ghost sm" style="margin-top:10px" data-action="addExp">+ ' + esc(t('add_expense_row')) + '</button>' +
-
-          '<div style="margin-top:18px" id="dayCalc"></div>' +
-          '<button class="btn" style="width:100%;margin-top:16px" data-action="saveDay">' + esc(t('submit_day')) + '</button>' +
+          '</div>') +
+          (off ? '' : '<button class="btn ghost sm" style="margin-top:10px" data-action="addExp">+ ' + esc(t('add_expense_row')) + '</button>') +
+          (off ? '' : '<div style="margin-top:18px" id="dayCalc"></div>') +
+          '<button class="btn" style="width:100%;margin-top:16px" data-action="saveDay">' +
+            esc(off ? t('submit_day_off') : t('submit_day')) + '</button>' +
         '</div>' +
         '<div class="card"><div class="cardhead"><div><h2>' + esc(t('recent_days')) + '</h2></div></div>' +
           (mine.length ? '<div class="stack">' + mine.map(c =>
             '<div class="rowline"><div class="m"><div class="n">' + esc(I.date(c.date, true)) + '</div>' +
-              '<div class="w">' + esc(t('day_gross')) + ' ' + money(c.gross) + '</div></div>' +
-              '<span class="pill ' + (c.status === 'open' ? 'warn' : 'ok') + '">' +
-                esc(c.status === 'open' ? t('awaiting') : t('settled')) + '</span>' +
-              '<div class="amt plus">' + money(c.uncle) + '</div></div>').join('') + '</div>'
+              '<div class="w">' + esc(c.worked ? t('day_gross') + ' ' + money(c.gross) : t('day_off')) + '</div></div>' +
+              '<span class="pill ' + (!c.worked ? '' : c.status === 'open' ? 'warn' : 'ok') + '">' +
+                esc(!c.worked ? t('day_off') : c.status === 'open' ? t('awaiting') : t('settled')) + '</span>' +
+              '<div class="amt' + (c.worked ? ' plus' : '') + '">' + (c.worked ? money(c.uncle) : '\u2014') + '</div></div>').join('') + '</div>'
             : '<div class="empty">' + esc(t('no_days')) + '</div>') + '</div></div>';
     },
     after: function (page) {
@@ -903,47 +912,141 @@
     '</div>';
   }
 
-  /* History */
+  /* ------------------------------------------------------------------
+     History. For Abdo this is EVERY movement in the family, from all three
+     places money is recorded, in one feed he can slice by person:
+
+       ledger  the family ledger        (rent, food, allowances, remittances)
+       member  Zeyad's and Rewan's own submissions, with their status
+       car     Joe's days — worked or off
+
+     They are kept as separate stores on purpose (a member's spending must
+     not be double-counted against the family, and a car day is not a
+     transaction until it settles) — but the accountant needs one place to
+     look, so they are normalised into a single event shape here.
+  ------------------------------------------------------------------ */
+  function allEvents() {
+    const rows = [];
+
+    D.tx.forEach(x => rows.push({
+      id: x.id, src: 'ledger', date: x.date,
+      person: x.forWhom || null, label: t(x.note) || x.note, cat: x.cat,
+      amount: x.amount, sign: x.type === 'income' ? 1 : -1,
+      type: x.type, status: null, by: x.by
+    }));
+
+    D.memberTx.forEach(m => rows.push({
+      id: m.id, src: 'member', date: m.date,
+      person: m.person, label: t(m.note) || m.note, cat: m.cat,
+      amount: m.amount, sign: -1,
+      type: 'expense', status: m.status, by: m.person
+    }));
+
+    D.carDays.forEach(c => rows.push({
+      id: c.id, src: 'car', date: c.date,
+      person: c.submittedBy,
+      label: c.worked ? t('day_gross') + ' ' + money(c.gross) : t('day_off'),
+      cat: 'carprofit', amount: c.worked ? c.family : 0,
+      sign: c.worked ? 1 : 0,
+      type: 'income', status: c.worked ? c.status : 'off', by: c.submittedBy,
+      car: c
+    }));
+
+    return rows;
+  }
+
+  const SRC_COLOR = { ledger: 'var(--trend)', member: 'var(--neutral)', car: 'var(--income)' };
+
+  function eventRow(e) {
+    const amt = e.sign === 0
+      ? '<div class="amt" style="color:var(--sub)">\u2014</div>'
+      : '<div class="amt ' + (e.sign > 0 ? 'plus' : 'minus') + '">' +
+          (e.sign > 0 ? '+' : '\u2212') + money(e.amount) + '</div>';
+    return '<div class="tx">' +
+      '<div class="dot" style="background:' + ccolor(e.cat) + '">' + esc(cname(e.cat).slice(0, 2)) + '</div>' +
+      '<div class="m"><div class="n">' + esc(e.label) + '</div>' +
+        '<div class="w"><span>' + esc(t('src_' + e.src)) + '</span>' +
+          '<span>' + esc(cname(e.cat)) + '</span>' +
+          (e.person ? '<span>' + esc(pname(e.person)) + '</span>' : '') +
+          '<span>' + esc(I.date(e.date)) + '</span></div></div>' +
+      (e.status && e.status !== 'approved' && e.status !== 'settled' ? statusPill(e.status) : '') +
+      amt + '</div>';
+  }
+
+  function groupedEvents(list) {
+    if (!list.length) return '<div class="empty">' + esc(t('results_none')) + '</div>';
+    const groups = [];
+    list.slice().sort(byDateDesc).forEach(e => {
+      const k = dayKey(e.date);
+      let g = groups.find(g => g.k === k);
+      if (!g) { g = { k, date: e.date, items: [] }; groups.push(g); }
+      g.items.push(e);
+    });
+    return groups.map(g => {
+      const net = g.items.reduce((s, e) => s + e.sign * e.amount, 0);
+      return '<div class="dayhead"><span>' + esc(relDay(g.date)) + '</span>' +
+             '<span>' + money(net, { signed: true }) + '</span></div>' +
+             '<div class="txlist">' + g.items.map(eventRow).join('') + '</div>';
+    }).join('');
+  }
+
   SCREENS.history = {
     html: function () {
       const f = state.filters;
       const mine = can.member();
-      const source = mine
-        ? D.memberTx.filter(m => m.person === state.user.id)
-            .map(m => ({ id:m.id, type:'expense', cat:m.cat, amount:m.amount, date:m.date, note:m.note, forWhom:state.user.id, currency:'EGP' }))
-        : D.tx;
 
-      let list = source.filter(x => {
-        if (f.type !== 'all' && x.type !== f.type) return false;
-        if (f.cat !== 'all' && x.cat !== f.cat) return false;
-        if (f.person !== 'all' && x.forWhom !== f.person) return false;
+      const source = mine
+        ? D.memberTx.filter(m => m.person === state.user.id).map(m => ({
+            id: m.id, src: 'member', date: m.date, person: m.person,
+            label: t(m.note) || m.note, cat: m.cat, amount: m.amount,
+            sign: -1, type: 'expense', status: m.status, by: m.person
+          }))
+        : allEvents();
+
+      const list = source.filter(e => {
+        if (f.src !== 'all' && e.src !== f.src) return false;
+        if (f.type !== 'all' && e.type !== f.type) return false;
+        if (f.cat !== 'all' && e.cat !== f.cat) return false;
+        if (f.person !== 'all' && e.person !== f.person) return false;
         if (f.q) {
-          const hay = (t(x.note) + ' ' + cname(x.cat) + ' ' + (x.forWhom ? pname(x.forWhom) : '')).toLowerCase();
+          const hay = (e.label + ' ' + cname(e.cat) + ' ' +
+                       (e.person ? pname(e.person) : '') + ' ' + t('src_' + e.src)).toLowerCase();
           if (hay.indexOf(f.q.toLowerCase()) < 0) return false;
         }
         return true;
       });
 
-      const cats = D.categories.filter(c => source.some(x => x.cat === c.id));
-      const persons = D.people.filter(p => source.some(x => x.forWhom === p.id));
-      const chip = (action, val, cur, label) =>
-        '<button class="chip ' + (cur === val ? 'on' : '') + '" data-action="' + action + '" data-v="' + val + '">' + esc(label) + '</button>';
+      const cats = D.categories.filter(c => source.some(e => e.cat === c.id));
+      const persons = D.people.filter(p => source.some(e => e.person === p.id));
+      const chip = (action, val, cur, label, dot) =>
+        '<button class="chip ' + (cur === val ? 'on' : '') + '" data-action="' + action + '" data-v="' + val + '">' +
+          (dot ? '<i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:6px;background:' + dot + '"></i>' : '') +
+          esc(label) + '</button>';
+
+      const inflow  = list.filter(e => e.sign > 0).reduce((s, e) => s + e.amount, 0);
+      const outflow = list.filter(e => e.sign < 0).reduce((s, e) => s + e.amount, 0);
 
       return '<div class="card"><input id="fq" class="input" placeholder="' + esc(t('search_ph')) + '" value="' + esc(f.q) + '">' +
-          '<div style="margin-top:12px" class="chips">' +
-            chip('fType','all',f.type,t('all')) + chip('fType','income',f.type,t('income')) + chip('fType','expense',f.type,t('expense')) +
-          '</div>' +
+          (mine ? '' :
+            '<div style="margin-top:12px" class="chips">' + chip('fSrc','all',f.src,t('all')) +
+              chip('fSrc','ledger',f.src,t('src_ledger'), SRC_COLOR.ledger) +
+              chip('fSrc','member',f.src,t('src_member'), SRC_COLOR.member) +
+              chip('fSrc','car',   f.src,t('src_car'),    SRC_COLOR.car) + '</div>') +
+          '<div style="margin-top:8px" class="chips">' +
+            chip('fType','all',f.type,t('filter_type')) + chip('fType','income',f.type,t('income')) +
+            chip('fType','expense',f.type,t('expense')) + '</div>' +
           '<div style="margin-top:8px" class="chips">' + chip('fCat','all',f.cat,t('filter_cat')) +
             cats.map(c => chip('fCat', c.id, f.cat, cname(c.id))).join('') + '</div>' +
           (mine ? '' : '<div style="margin-top:8px" class="chips">' + chip('fPerson','all',f.person,t('filter_person')) +
             persons.map(p => chip('fPerson', p.id, f.person, pname(p.id))).join('') + '</div>') +
-          '<div style="margin-top:12px;display:flex;align-items:center;gap:10px">' +
+          '<div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
             '<span class="pill">' + esc(t('results_count', { n: I.n(list.length) })) + '</span>' +
-            '<span class="pill">' + esc(t('total')) + ': ' + money(sum(list)) + '</span>' +
+            '<span class="pill ok">+' + money(inflow) + '</span>' +
+            '<span class="pill due">\u2212' + money(outflow) + '</span>' +
             '<button class="btn ghost sm" data-action="clearF">' + esc(t('clear_filters')) + '</button>' +
           '</div>' +
         '</div>' +
-        '<div class="card" style="margin-top:16px">' + groupedByDay(list) + '</div>';
+        '<div class="card" style="margin-top:16px">' + groupedEvents(list) + '</div>';
     },
     after: function (page) {
       const q = page.querySelector('#fq');
@@ -1126,14 +1229,16 @@
     },
     signin: function (el) { state.user = person(el.dataset.id); state.screen = 'dashboard'; render(); },
     signout: function () { state.user = null; render(); },
-    go: function (el) { state.screen = el.dataset.s; state.filters = { q:'', type:'all', cat:'all', person:'all' }; renderShell(); },
+    go: function (el) { state.screen = el.dataset.s; state.filters = { q:'', type:'all', cat:'all', person:'all', src:'all' }; renderShell(); },
     type: function (el) { state.addType = el.dataset.v; state.addCat = null; state.addCurrency = 'EGP'; renderShell(); },
     cat: function (el) { state.addCat = el.dataset.c; renderShell(); },
+    dayMode: function (el) { state.dayOff = el.dataset.v === 'off'; renderShell(); },
     table: function (el) { state.tables[el.dataset.id] = !state.tables[el.dataset.id]; renderShell(); },
     fType: function (el) { state.filters.type = el.dataset.v; renderShell(); },
     fCat: function (el) { state.filters.cat = el.dataset.v; renderShell(); },
+    fSrc: function (el) { state.filters.src = el.dataset.v; renderShell(); },
     fPerson: function (el) { state.filters.person = el.dataset.v; renderShell(); },
-    clearF: function () { state.filters = { q:'', type:'all', cat:'all', person:'all' }; renderShell(); },
+    clearF: function () { state.filters = { q:'', type:'all', cat:'all', person:'all', src:'all' }; renderShell(); },
 
     save: function () {
       const err = document.getElementById('fErr');
@@ -1183,12 +1288,17 @@
     pay: function (el) { payOne(el.dataset.id); renderShell(); toast(t('saved')); },
     payAll: function () {
       D.people.filter(p => p.allowance > 0).forEach(p => payOne(p.id));
+      // (each payOne is a no-op if that person already has this period)
       renderShell(); toast(t('saved'));
     },
 
     settleDay: function (el) {
       const c = D.carDays.find(x => x.id === el.dataset.id);
-      if (!c || c.status === 'settled') return;
+      // Guard on the status, not on what the screen last rendered — two
+      // devices settling the same day would otherwise post income twice.
+      // In SQL: UPDATE ... WHERE id = ? AND status = 'open', then check
+      // the affected row count.
+      if (!c || c.status !== 'open') { toast(t('already_settled')); return; }
       c.status = 'settled';
       c.settledBy = state.user.id;
       D.add({ type:'income', cat:'carprofit', amount:c.family, date:c.date, note:'n_car_share', src:c.id });
@@ -1212,18 +1322,32 @@
       const err = document.getElementById('dErr');
       const gross = Math.max(0, parseFloat(f.gross) || 0);
       const amtEl = document.getElementById('dGross');
+      const fail = msg => { err.hidden = false; err.textContent = msg; };
       err.hidden = true; amtEl.classList.remove('err');
-      if (!(gross > 0)) {
-        err.hidden = false; err.textContent = t('err_amount'); amtEl.classList.add('err');
+
+      // A day off is a real record: no takings, no costs, but the date is
+      // logged so "rested" is distinguishable from "not submitted yet".
+      if (state.dayOff) {
+        const offDate = parseDate(f.date);
+        if (!offDate || isNaN(offDate)) { fail(t('err_date')); return; }
+        if (offDate > D.TODAY)          { fail(t('err_future')); return; }
+        if (D.dayTaken(offDate))        { fail(t('err_dup_day')); return; }
+        D.carDays.push(D.dayOff(offDate, state.user.id));
+        state.day = null; state.dayOff = false; state.screen = 'myearnings';
+        renderShell(); toast(t('day_off_saved'));
         return;
       }
+      if (!(gross > 0)) { fail(t('err_amount')); amtEl.classList.add('err'); return; }
       const items = f.rows.filter(r => (parseFloat(r.amount) || 0) > 0)
         .map(r => ({ id: D.uid('ce'), label: r.label, kind: r.kind,
                      amount: Math.round(parseFloat(r.amount)),
                      note: (r.note || '').trim() || null }));
       const date = parseDate(f.date);
+      if (!date || isNaN(date)) { fail(t('err_date')); return; }
+      if (date > D.TODAY)       { fail(t('err_future')); return; }
+      if (D.dayTaken(date))     { fail(t('err_dup_day')); return; }
       D.carDays.push(Object.assign({
-        id: D.uid('cd'), date, gross, expenses: items,
+        id: D.uid('cd'), date, gross, expenses: items, worked: true,
         status: 'open', submittedBy: state.user.id, settledBy: null
       }, D.settleDay(gross, items)));
       state.day = null;
@@ -1243,7 +1367,6 @@
       if (!(v > 0)) return toast(t('err_amount'));
       const amount = Math.min(Math.round(v), left);
       l.payments.push({ id: D.uid('lp'), amount, date: D.TODAY });
-      if (amount >= left) l.status = 'repaid';
       D.add({ type:'expense', cat:'loanrepay', amount, date:D.TODAY, note:'n_loan_out', src:l.id });
       renderShell(); toast(t('saved'));
     }
@@ -1258,11 +1381,19 @@
     toast(t(status));
   }
 
-  function payOne(id) {
+  /* UNIQUE(recipient, period) in the schema. The period is derived from the
+     date being paid, never hardcoded, so paying October cannot be mistaken
+     for paying September. */
+  function payOne(id, month) {
     const p = person(id);
-    if (D.allowances.some(a => a.person === id && a.month === 9)) return;
-    D.allowances.push({ id: D.uid('a'), person: id, amount: p.allowance, month: 9, paidOn: D.TODAY, paidBy: 'abdo' });
-    D.add({ type:'expense', cat:'allowance', amount:p.allowance, forWhom:id, date:D.TODAY, note:'n_allowance' });
+    const period = month || (D.TODAY.getMonth() + 1);
+    if (D.allowances.some(a => a.person === id && a.month === period)) return false;
+    const amount = D.rateOn(id, D.TODAY);
+    if (!amount) return false;
+    D.allowances.push({ id: D.uid('a'), person: id, amount, month: period,
+                        paidOn: D.TODAY, paidBy: state.user.id });
+    D.add({ type:'expense', cat:'allowance', amount, forWhom:id, date:D.TODAY, note:'n_allowance' });
+    return true;
   }
 
   let toastTimer;
