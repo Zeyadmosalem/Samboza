@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(28);
+select plan(34);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -103,6 +103,12 @@ select is(tests.rows_in('select 1 from journals'), 0::bigint,
 select is(tests.rows_in('select 1 from accounts'), 0::bigint,
   'Zeyad cannot read accounts');
 
+select is(tests.rows_in('select 1 from ledger_feed'), 0::bigint,
+  'Zeyad cannot read the ledger through ledger_feed');
+
+select is(tests.rows_in('select 1 from account_balances where balance <> 0'), 0::bigint,
+  'Zeyad cannot read balances through account_balances');
+
 select is(tests.rows_in('select 1 from personal_entries'), 0::bigint,
   'Zeyad cannot read Ghada''s personal book');
 
@@ -147,6 +153,14 @@ select is(tests.rows_in('select 1 from member_expenses'), 0::bigint,
 select is(tests.rows_in('select 1 from personal_entries'), 0::bigint,
   'Joe cannot read Ghada''s personal book');
 
+-- The leak that prompted 0008: RLS refused him `entries`, and the VIEW over
+-- `entries` handed him the rows anyway.
+select is(tests.rows_in('select 1 from ledger_feed'), 0::bigint,
+  'Joe cannot read the ledger through ledger_feed');
+
+select is(tests.rows_in('select 1 from account_balances where balance <> 0'), 0::bigint,
+  'Joe cannot read balances through account_balances');
+
 select throws_ok(
   $$insert into car_days (family_id, drive_date, submitted_by, status,
                           gross_egp, direct_egp, indirect_egp, net_egp,
@@ -175,6 +189,9 @@ select cmp_ok(tests.rows_in('select 1 from entries'), '>', 0::bigint,
 
 select cmp_ok(tests.rows_in('select 1 from member_expenses'), '>', 0::bigint,
   'Ghada reads member submissions');
+
+select cmp_ok(tests.rows_in('select 1 from ledger_feed'), '>', 0::bigint,
+  'Ghada DOES read the ledger through ledger_feed — locking it down must not break the auditor');
 
 select is(tests.rows_in('select 1 from personal_entries'), 1::bigint,
   'Ghada reads her own personal book');
@@ -238,6 +255,25 @@ update people set active = false where id = 'bbbb0000-0000-4000-8000-00000000000
 select tests.be('33333333-3333-4333-8333-333333333333');
 select is(tests.rows_in('select 1 from member_expenses'), 0::bigint,
   'a deactivated person loses access immediately');
+
+-- =====================================================================
+-- Structural: every view in public must obey the caller's permissions.
+-- Without this, the next view added reintroduces the leak silently.
+-- =====================================================================
+select is(
+  (select count(*)::bigint
+     from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+    where c.relkind = 'v'
+      and n.nspname = 'public'
+      and not coalesce((
+        select option_value = 'true'
+          from pg_options_to_table(c.reloptions)
+         where option_name = 'security_invoker'
+      ), false)),
+  0::bigint,
+  'every view in public has security_invoker on'
+);
 
 select * from finish();
 rollback;
