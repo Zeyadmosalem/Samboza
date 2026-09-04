@@ -145,7 +145,22 @@ Build in this order. Each step is demoable to the family on its own.
 1. **Ledger + History** — record income and expense, see them listed, filter by
    person and source. Abdo's History shows all three stores in one feed — the
    family ledger, member submissions and car days — sliceable by person.
-   Everything else is a special case of this.
+   Everything else is a special case of this. **DONE**, and three things worth
+   recording from building it:
+
+   - The admin's form and the member's form look similar and are not the same
+     act. One calls `record_transaction` and posts a balanced journal
+     immediately; the other writes a row to a sub-ledger that never touches the
+     ledger at all, because the family already expensed the allowance when it
+     was handed over. Counting the spending again would double-count it.
+   - **A KPI must show a dash until its query returns, never a zero.** `sum([])`
+     is 0, so a loading dashboard would say "Cash in hand: EGP 0" — a specific,
+     wrong, believable claim about the family's money.
+   - RLS denies by returning **no rows and no error**, so every screen has to
+     treat "empty" as an answer. A member opening History sees an empty ledger
+     and a note explaining it, not a failure — and the same emptiness must not
+     be shown to a disconnected admin, which is why the loader distinguishes
+     failed from empty.
 2. **Allowances** — effective-dated rates, disbursement, per-person balances.
 3. **Member submissions + approvals** — pending until Abdo decides.
    *Ship the notification with it.* Without a nudge the queue silently rots and
@@ -163,6 +178,28 @@ Build in this order. Each step is demoable to the family on its own.
 
 **Checkpoint after each:** the family uses it for a week on real numbers before
 you build the next one.
+
+### The checks, and their expiry date
+
+`app/` has no test framework and is not getting one for two smoke tests. What it
+has instead is three scripts in `scripts/`, run against the live project:
+
+```
+npm run check:guards     the security invariants — what 0008 and 0009 fixed
+npm run check:screens    every query each screen makes, as each real person
+npm run check:browser    the screens in a real browser; records money and reads
+                         it back  (needs: cd app && npm run build && npm run preview)
+```
+
+`check:guards` exists because `supabase test db` needs Docker and Docker is
+often not there. The pgTAP suite in CI is the real gate; this asks the same
+questions of the deployed database.
+
+**They refuse to run once the ledger has anything in it.** They seed and delete
+rows, and a cleanup that deletes by memo would take a real row with the same
+memo. The moment the family starts recording, these scripts stop working — which
+is correct, and not something to work around. Point them at a scratch project or
+delete them.
 
 ---
 

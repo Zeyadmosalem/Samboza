@@ -2,5 +2,15 @@
   "name": "samboza-scripts",
   "private": true,
   "type": "module",
-  "dependencies": { "@supabase/supabase-js": "^2.45.0" }
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "scripts": {
+    "bootstrap": "node bootstrap.mjs",
+    "check:env": "node check-env.mjs",
+    "check:guards": "node check-guards.mjs",
+    "check:screens": "node check-screens.mjs",
+    "check:browser": "node check-browser.mjs",
+    "check": "node check-guards.mjs && node check-screens.mjs && node check-browser.mjs"
+  }
 }

@@ -17,3 +17,6 @@ ios/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# typescript incremental build cache
+*.tsbuildinfo

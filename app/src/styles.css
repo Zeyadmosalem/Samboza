@@ -217,6 +217,118 @@ button { background:none; border:0; cursor:pointer; }
 
 .centred { min-height:100dvh; display:grid; place-items:center; color:var(--sub); }
 
+/* ------------------------------------------------------- the money screens */
+.stack { display:flex; flex-direction:column; gap:16px; }
+
+.cardhead {
+  display:flex; align-items:baseline; gap:12px;
+  margin-block-end:2px;
+}
+.cardhead h2 { flex:1; }
+
+/* KPIs. auto-fit rather than a fixed count: the driver gets four, a member
+   gets three, and neither should have a stretched or orphaned tile. */
+.kpis {
+  display:grid; gap:12px;
+  grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
+}
+.kpi {
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:16px 18px; box-shadow:var(--shadow);
+}
+.kpi .k { font-size:11.5px; font-weight:650; color:var(--sub); }
+.kpi .v {
+  font-size:23px; font-weight:750; letter-spacing:-.5px; margin-block-start:7px;
+  font-variant-numeric:tabular-nums; direction:ltr; unicode-bidi:isolate;
+  text-align:start;
+}
+/* The -text tokens, not the series colours: the chart hues are chosen for
+   separability against each other and do not clear 4.5:1 against the card. */
+.kpi .v.in   { color:var(--income-text); }
+.kpi .v.out  { color:var(--expense-text); }
+.kpi .v.warn { color:var(--expense-text); }
+/* Not yet known. Deliberately dimmer than a real figure, so a glance can tell
+   "still loading" from "the answer is zero". */
+.kpi .v.muted { color:var(--line); }
+.kpi .n { font-size:11px; color:var(--sub); margin-block-start:6px; }
+
+.notice {
+  display:block; text-decoration:none; font-size:12.5px; font-weight:650;
+  padding:12px 16px; border-radius:var(--radius-sm);
+  background:var(--accent-soft); color:var(--accent-text);
+  border:1px solid transparent;
+}
+.notice.flat {
+  background:var(--line-soft); color:var(--sub); font-weight:500;
+  border-color:var(--line);
+}
+
+/* Rows stay opaque and cheap. Whatever the glass pass does to the chrome,
+   a 500-row history must not get a compositor layer per line. */
+.rows { display:flex; flex-direction:column; margin-block-start:6px; }
+.row {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 8px; border-block-end:1px solid var(--line-soft);
+}
+.row:last-child { border-block-end:0; }
+.row:hover { background:var(--row-hover); }
+.dot { width:8px; height:8px; border-radius:999px; flex:none; }
+.rowmain { flex:1; min-width:0; }
+.rowtitle {
+  display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+  font-size:13px; font-weight:650;
+}
+.rowsub {
+  font-size:11.5px; color:var(--sub); margin-block-start:3px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.amt {
+  font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums;
+  direction:ltr; unicode-bidi:isolate; white-space:nowrap;
+}
+.amt.plus  { color:var(--income-text); }
+.amt.minus { color:var(--expense-text); }
+
+.badge {
+  font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;
+  background:var(--line-soft); color:var(--sub); white-space:nowrap;
+}
+.badge.approved, .badge.settled  { background:var(--accent-soft); color:var(--accent-text); }
+.badge.pending,  .badge.recorded { background:var(--pill-member-bg); color:var(--pill-member-fg); }
+.badge.rejected, .badge.warn     { background:var(--pill-driver-bg); color:var(--pill-driver-fg); }
+.badge.src-ledger     { background:var(--accent-soft);      color:var(--accent-text); }
+.badge.src-submission { background:var(--pill-viewer-bg);   color:var(--pill-viewer-fg); }
+.badge.src-car        { background:var(--pill-member-bg);   color:var(--pill-member-fg); }
+
+/* ------------------------------------------------------------------ forms */
+.form { max-width:520px; }
+.form .field + .field { margin-top:16px; }
+.field .opt { font-weight:500; color:var(--sub); }
+.grid2 { display:grid; gap:14px; grid-template-columns:1fr 1fr; margin-block-start:16px; }
+.grid2 .field + .field { margin-top:0; }
+.grid2 + .field { margin-top:16px; }
+
+select.input { appearance:none; background-image:none; }
+
+.seg { display:inline-flex; background:var(--line-soft); border-radius:11px; padding:3px; }
+.segbtn {
+  border:0; background:transparent; color:var(--sub); cursor:pointer;
+  font:inherit; font-size:12.5px; font-weight:650; padding:7px 18px; border-radius:9px;
+}
+.segbtn.on { background:var(--raised); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.09); }
+
+.donemark {
+  width:52px; height:52px; margin:8px auto 0; border-radius:999px;
+  display:grid; place-items:center; font-size:24px;
+  background:var(--accent-soft); color:var(--accent-text);
+}
+
+.filters {
+  display:grid; gap:14px;
+  grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+}
+.filters .field + .field { margin-top:0; }
+
 @media (max-width:900px) {
   .shell { grid-template-columns:1fr; }
   .sidebar {
@@ -226,4 +338,6 @@ button { background:none; border:0; cursor:pointer; }
   .sidebar .navgroup { display:none; }
   .brand { padding:0 10px 0 0; }
   .page, .topbar { padding-inline:18px; }
+  .grid2 { grid-template-columns:1fr; }
+  .form { max-width:none; }
 }

@@ -23,9 +23,18 @@ interface AuthState {
   family: Family | null
   /** Every family this human belongs to; more than one is possible. */
   memberships: { person: Person; family: Family }[]
+  /**
+   * The membership lookup FAILED, as opposed to returning nothing. The two
+   * are completely different — one is "you were removed", the other is "the
+   * train went into a tunnel" — and showing the first message for the second
+   * accuses the family of a permissions problem they do not have.
+   */
+  membershipError: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   chooseFamily: (familyId: string) => void
+  /** Retry the membership lookup after a failure. */
+  reload: () => void
 }
 
 const Ctx = createContext<AuthState | null>(null)
@@ -34,6 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
   const [memberships, setMemberships] = useState<AuthState['memberships']>([])
+  const [membershipError, setMembershipError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [familyId, setFamilyId] = useState<string | null>(
     () => localStorage.getItem('samboza-family')
   )
@@ -88,7 +99,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('active', true)
 
       if (cancelled) return
-      if (error || !data?.length) {
+      if (error) {
+        // The lookup did not run. Distinct from running and finding nothing:
+        // a dropped connection is not a revoked account, and telling someone
+        // they have been removed from their own family because the wifi went
+        // is the kind of message that gets a phone call.
+        setMembershipError(true)
+        setMemberships([])
+        setLoading(false)
+        return
+      }
+      setMembershipError(false)
+      if (!data?.length) {
         // Authenticated but not a member of anything — a real state, not a
         // crash. Someone was deactivated, or an account exists with no person.
         setMemberships([])
@@ -107,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [session])
+  }, [session, attempt])
 
   const current = memberships.find(m => m.family.id === familyId) ?? memberships[0] ?? null
 
@@ -117,6 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     person: current?.person ?? null,
     family: current?.family ?? null,
     memberships,
+    membershipError,
+    reload() {
+      setLoading(true)
+      setMembershipError(false)
+      setAttempt(n => n + 1)
+    },
     async signIn(email, password) {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),

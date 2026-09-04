@@ -88,6 +88,12 @@ const CATEGORIES = [
   { en: 'Medical',   ar: 'العلاج',    kind: 'expense', colour: '#e87ba4' },
   { en: 'Gifts',     ar: 'الهدايا',   kind: 'expense', colour: '#8a9490', needs_recipient: true },
   { en: 'Other',     ar: 'أخرى',      kind: 'expense', colour: '#8a9490' },
+  // Income the family receives directly. Remittances and the car have their
+  // own screens and their own accounts, so this is deliberately the only one:
+  // without it the income side of Add Transaction is an empty dropdown, and
+  // money that arrives any other way has nowhere to go. Split it into real
+  // categories from Settings once the family knows what they actually are.
+  { en: 'Other income', ar: 'دخل آخر', kind: 'income', colour: '#6f5bd4' },
 ]
 
 /* Monthly allowances, in PIASTRES. Effective-dated (D3), so raising one

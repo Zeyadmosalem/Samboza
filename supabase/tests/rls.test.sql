@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(34);
+select plan(39);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -42,7 +42,10 @@ insert into people (id, family_id, member_no, display_name, relationship,
 
 insert into accounts (id, family_id, kind, name, system_key) values
   ('cccc0000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001','asset','Cash','cash'),
-  ('cccc0000-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001','income','Car income','car_income');
+  ('cccc0000-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001','income','Car income','car_income'),
+  ('cccc0000-0000-4000-8000-000000000003','aaaaaaaa-0000-4000-8000-000000000001','asset','Due from driver','due_from_driver'),
+  -- The OTHER family's cash. Nothing in Samboza may ever post to it.
+  ('cccc0000-0000-4000-8000-000000000004','aaaaaaaa-0000-4000-8000-000000000002','asset','Their cash','cash');
 
 insert into categories (id, family_id, name_en, name_ar, kind, account_id) values
   ('dddd0000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001','Food','الأكل','expense','cccc0000-0000-4000-8000-000000000002');
@@ -235,6 +238,34 @@ select throws_ok(
     values ('eeee0000-0000-4000-8000-000000000001','cccc0000-0000-4000-8000-000000000001', 1)$$,
   '42501', null, 'not even Abdo writes to the ledger directly — post_journal() only');
 
+-- ------------------------------------------------------------------ 0009
+-- post_journal is SECURITY DEFINER, so RLS does not run inside it and the
+-- arguments are checked there or nowhere. Before 0009 both of these SUCCEEDED:
+-- a legitimate admin could move money into a family he is not in, and the
+-- victim saw the balance change with no journal they were allowed to read.
+select throws_ok(
+  $$select post_journal('aaaaaaaa-0000-4000-8000-000000000001', current_date, 'cross-family',
+      jsonb_build_array(
+        jsonb_build_object('account_id','cccc0000-0000-4000-8000-000000000004','amount', 5000),
+        jsonb_build_object('account_id','cccc0000-0000-4000-8000-000000000001','amount',-5000)))$$,
+  '42501', null, 'the admin cannot post a line against another family''s account');
+
+select throws_ok(
+  $$select post_journal('aaaaaaaa-0000-4000-8000-000000000001', current_date, 'cross-family name',
+      jsonb_build_array(
+        jsonb_build_object('account_id','cccc0000-0000-4000-8000-000000000001','amount', 5000,
+                           'person_id','bbbb0000-0000-4000-8000-000000000006'),
+        jsonb_build_object('account_id','cccc0000-0000-4000-8000-000000000002','amount',-5000)))$$,
+  '42501', null, 'the admin cannot put another family''s person on a ledger line');
+
+-- The handover no longer takes account parameters: it derives cash and
+-- due_from_driver from the family itself. 37,000 counted against 37,500 due
+-- leaves 500 sitting in the receivable — D12, carried rather than written off.
+select lives_ok(
+  $$select confirm_handover('aaaaaaaa-0000-4000-8000-000000000001',
+      array['99990000-0000-4000-8000-000000000001']::uuid[], current_date, 37000)$$,
+  'the admin confirms a handover without naming the accounts');
+
 -- =====================================================================
 -- Cross-tenant. The whole multi-family promise rests on these two.
 -- =====================================================================
@@ -245,6 +276,19 @@ select is(tests.rows_in('select 1 from entries'), 0::bigint,
 
 select is(tests.rows_in('select 1 from people where family_id = ''aaaaaaaa-0000-4000-8000-000000000001'''),
   0::bigint, 'another family sees none of the Samboza people');
+
+-- The NULL-role fall-through, fixed in 0009. `if v_me.role <> 'admin'` is
+-- NULL — not TRUE — when my_person() finds no row, so the guard did not fire
+-- for a caller who is not a member at all. Both of these used to get past the
+-- role check and be stopped further down by a constraint: 23514 here, 23502
+-- in reverse_journal. A constraint firing is not an authorisation decision.
+select throws_ok(
+  $$select decide_member_expense('ffff0000-0000-4000-8000-000000000001', 'approved')$$,
+  '42501', null, 'a non-member cannot decide a Samboza submission');
+
+select throws_ok(
+  $$select reverse_journal('eeee0000-0000-4000-8000-000000000001', 'not yours')$$,
+  '42501', null, 'a non-member cannot reverse a Samboza journal');
 
 -- =====================================================================
 -- Deactivation takes effect on the NEXT REQUEST, not at token expiry.

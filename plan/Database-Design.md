@@ -577,3 +577,40 @@ database constraint, not an application `if`.
 
 Migrations are files in the repo from the first line. **The Supabase dashboard
 is for looking, not for changing.**
+
+## 0009 — a definer function must not trust its arguments
+
+Found by an audit that queried the database rather than reading it, which is the
+second time that distinction has mattered here (0008 was the first).
+
+`post_journal` is `SECURITY DEFINER`. It runs as the table owner, RLS does not
+apply inside it, and its own checks are therefore the *only* checks. It verified
+that the caller was the family's admin — and then trusted every id the caller
+handed it. Signed in as Abdo, a legitimate admin of Samboza, it was possible to
+post a journal line against **another family's account**. Abdo could not read
+the journal back afterwards, because `entries_read` scopes to the journal's
+family; the other family's `account_balances` simply included the amount, with
+no journal they were allowed to see to explain it.
+
+Three functions had the same shape and are fixed together: `post_journal`
+(accounts, people and categories on the lines), `confirm_handover` (which took
+the cash and receivable accounts as *parameters* — it now derives them from the
+family), and `record_transaction` (`p_person`, where the impact was attribution
+rather than money).
+
+A fourth problem was latent in four functions:
+
+```sql
+v_me := my_person(p_family);
+if v_me.role <> 'admin' then raise ...   -- NULL when v_me is no row
+```
+
+`NULL <> 'admin'` is NULL, not TRUE, so the branch is not taken — and the caller
+who is not a member of that family at all is exactly the one it was written to
+stop. Each was saved further down by a NOT NULL or CHECK constraint failing,
+which is an accident rather than a control: the errors were 23502 and 23514
+where they should have been 42501. All four now test `v_me.id is null or
+v_me.role is distinct from 'admin'`.
+
+The five assertions added to `supabase/tests/rls.test.sql` all fail against
+0008 and pass against 0009.

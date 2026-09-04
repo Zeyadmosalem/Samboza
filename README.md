@@ -146,8 +146,31 @@ reality. There is no "old rule" period and no history to restate.
 
 ## Status
 
-Planning. The nine questions in §10 of the plan were **settled with the family on
-4 September 2026**, and every answer is built into the demo. One question came out
-of that conversation and is still open: what happens on a day where expenses
-exceed the takings. The demo floors the net at zero; carrying the deficit forward
-is the alternative, and it needs deciding before Phase 0 starts.
+**Building.** The nine questions in §10 of the plan were settled with the family
+on 4 September 2026, and three more were settled during Phase 0 — including the
+one the demo got wrong: a day where costs exceed takings is recorded **negative**
+and shared in the same ratios as a profit (D10). It is not floored at zero.
+
+| | |
+|---|---|
+| Phase 0 — schema, RLS, tests | **done** · 9 migrations, 39 pgTAP assertions, green in CI |
+| Phase 1 — auth and the shell | **done** · five people sign in, each sees their own navigation |
+| Phase 2 — the money | **step 1 of 8 done** · the ledger, Add Transaction and History |
+| The glass restyle | after the screens exist, as planned |
+
+What Phase 2 step 1 delivers: Abdo records income and expense straight into the
+double-entry ledger; a member records against their allowance and it waits for
+his approval; History stitches the ledger, member submissions and car days into
+one filterable feed, and shows each person only what the database lets them see.
+
+Steps 2–8 — allowances, approvals, the car, remittances, loans, reports, offline
+— are next, in that order.
+
+### Before real money goes in
+
+Two things are still outstanding and both are the family's to do:
+
+- **Change the five passwords.** Bootstrap set the same temporary one for
+  everybody. Supabase → Authentication → Users.
+- **Replace the placeholder emails** (`name@samboza.family`) with real ones, so
+  password resets can actually reach people.
