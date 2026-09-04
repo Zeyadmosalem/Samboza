@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Samboza Family Finance</title>
+    <script>
+      // Apply the remembered theme before first paint, so a dark-mode phone
+      // never flashes white on open.
+      (function () {
+        try {
+          var t = localStorage.getItem('samboza-theme')
+          if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t
+          var l = localStorage.getItem('samboza-lang')
+          if (l === 'ar') { document.documentElement.lang = 'ar'; document.documentElement.dir = 'rtl' }
+        } catch (e) { /* private mode */ }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

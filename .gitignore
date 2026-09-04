@@ -1,0 +1,19 @@
+# secrets — never commit these
+.env
+.env.local
+.env.*.local
+*.key
+
+# dependencies / build
+node_modules/
+dist/
+.vite/
+
+# capacitor (phase 5)
+android/
+ios/
+
+# editors / os
+.DS_Store
+Thumbs.db
+.vscode/
