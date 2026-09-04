@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(50);
+select plan(58);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -171,23 +171,53 @@ select is(tests.rows_in('select 1 from ledger_feed'), 0::bigint,
 select is(tests.rows_in('select 1 from account_balances where balance <> 0'), 0::bigint,
   'Joe cannot read balances through account_balances');
 
+-- 0012: a day is no longer inserted directly. Letting the client supply the
+-- net and the three shares let car_days.direct_egp disagree with the costs
+-- itemised beside it — `cd_net_is_derived` only ever compared the day's own
+-- columns to each other.
 select throws_ok(
-  $$insert into car_days (family_id, drive_date, submitted_by, status,
-                          gross_egp, direct_egp, indirect_egp, net_egp,
-                          driver_egp, family_egp, marwa_egp)
-    values ('aaaaaaaa-0000-4000-8000-000000000001', current_date - 1,
-            'bbbb0000-0000-4000-8000-000000000005', 'settled',
-            1000, 0, 0, 1000, 333, 500, 167)$$,
-  '42501', null, 'Joe cannot mark his own day settled');
-
-select lives_ok(
   $$insert into car_days (family_id, drive_date, submitted_by,
                           gross_egp, direct_egp, indirect_egp, net_egp,
                           driver_egp, family_egp, marwa_egp)
     values ('aaaaaaaa-0000-4000-8000-000000000001', current_date - 1,
             'bbbb0000-0000-4000-8000-000000000005',
             1000, 0, 0, 1000, 333, 500, 167)$$,
+  '42501', null, 'nobody writes a car day directly — record_car_day() only');
+
+select lives_ok(
+  $$select record_car_day('aaaaaaaa-0000-4000-8000-000000000001',
+      current_date - 1, true, 90000,
+      '[{"label":"fuel","class":"direct","amount_egp":15000}]'::jsonb)$$,
   'Joe CAN record a day');
+
+-- D2: the cost comes off before anyone's share. 90,000 − 15,000 = 75,000,
+-- and the family's three quarters of what is left after Joe's third is 37,500.
+select is(
+  (select family_egp from car_days where drive_date = current_date - 1),
+  37500::bigint, 'the split is computed in the database, from the costs given');
+
+-- D1: a day off is a RECORDED row. "Joe rested" and "Joe has not sent it in
+-- yet" must never look the same.
+select lives_ok(
+  $$select record_car_day('aaaaaaaa-0000-4000-8000-000000000001',
+      current_date - 2, false)$$,
+  'Joe CAN record a day off');
+
+select is(
+  (select status::text from car_days where drive_date = current_date - 2),
+  'off', 'and it is stored as a day off, not as an absence');
+
+-- D10: a large fine on a quiet day. The loss is shared in the same ratios,
+-- and is not floored at zero.
+select lives_ok(
+  $$select record_car_day('aaaaaaaa-0000-4000-8000-000000000001',
+      current_date - 3, true, 5000,
+      '[{"label":"ticket","class":"indirect","amount_egp":25000}]'::jsonb)$$,
+  'Joe CAN record a losing day');
+
+select is(
+  (select family_egp from car_days where drive_date = current_date - 3),
+  -10000::bigint, 'and the family carries its share of the loss');
 
 -- =====================================================================
 -- Ghada — viewer and auditor. Sees everything, changes nothing.
@@ -265,13 +295,41 @@ select throws_ok(
         jsonb_build_object('account_id','cccc0000-0000-4000-8000-000000000002','amount',-5000)))$$,
   '42501', null, 'the admin cannot put another family''s person on a ledger line');
 
+-- 0012, the hole this all existed to fill: before it, NOTHING ever debited
+-- due_from_driver, so the first handover drove it negative and the dashboard
+-- read zero however many days Joe had recorded.
+-- 37,500 earned on the good day, less 10,000 lost on the bad one.
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000003'),
+  27500::bigint, 'what Joe holds is a receivable from the day he earns it');
+
+-- A mistyped day is voided, never edited: its journal is reversed, so the
+-- correction is visible in the ledger rather than silent.
+select lives_ok(
+  $$select void_car_day((select id from car_days where drive_date = current_date - 3),
+                        'recorded twice')$$,
+  'the admin voids a day');
+
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000003'),
+  37500::bigint, 'and voiding it reverses the receivable it created');
+
 -- The handover no longer takes account parameters: it derives cash and
 -- due_from_driver from the family itself. 37,000 counted against 37,500 due
 -- leaves 500 sitting in the receivable — D12, carried rather than written off.
 select lives_ok(
   $$select confirm_handover('aaaaaaaa-0000-4000-8000-000000000001',
-      array['99990000-0000-4000-8000-000000000001']::uuid[], current_date, 37000)$$,
+      array(select id from car_days
+             where drive_date = current_date - 1 and voided_at is null),
+      current_date, 37000)$$,
   'the admin confirms a handover without naming the accounts');
+
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000003'),
+  500::bigint, 'a short handover carries the difference, and does not write it off');
 
 -- =====================================================================
 -- 0010 — the allowance: effective-dated, paid once, and what is left.

@@ -361,3 +361,37 @@ select.input { appearance:none; background-image:none; }
   background:var(--pill-driver-bg); color:var(--pill-driver-fg);
   border-color:transparent; font-weight:600;
 }
+
+/* ------------------------------------------------------------------- car */
+.wide-form { max-width:640px; }
+
+.costrow {
+  display:grid; gap:12px; align-items:end; margin-top:14px; padding:14px;
+  background:var(--line-soft); border-radius:var(--radius-sm);
+  grid-template-columns:1fr 1fr 1fr 1.4fr auto;
+}
+.costrow .field + .field { margin-top:0; }
+.costrow .seg { width:100%; }
+.costrow .segbtn { flex:1; padding:9px 6px; }
+
+/* The running total Joe checks before he submits. Tabular figures so the
+   column of numbers lines up and a wrong one is obvious at a glance. */
+.split {
+  margin-top:20px; padding:16px; border-radius:var(--radius-sm);
+  background:var(--line-soft);
+}
+.splitline {
+  display:flex; justify-content:space-between; gap:16px; padding:5px 0;
+  font-size:13px;
+}
+.splitline.muted { color:var(--sub); }
+.splitline.strong { font-weight:750; font-size:15px; }
+.splitline .amt { font-variant-numeric:tabular-nums; }
+.split hr { border:0; border-top:1px solid var(--line); margin:10px 0; }
+.split .hint { margin-top:10px; font-size:11.5px; color:var(--sub); }
+
+.row input[type="checkbox"] { width:16px; height:16px; accent-color:var(--accent); flex:none; }
+
+@media (max-width:900px) {
+  .costrow { grid-template-columns:1fr 1fr; }
+}

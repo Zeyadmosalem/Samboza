@@ -32,6 +32,10 @@ try {
 
 const browser = await launch()
 
+/** innerText for a detail line: one line, trimmed to fit the report. */
+const oneLine = (text, max = 120) =>
+  (text ?? '').split('\n').filter(Boolean).join(' · ').slice(0, max)
+
 const PEOPLE = [
   { email: 'abdo@samboza.family',  who: 'Abdo',  role: 'Admin',  kpis: 4 },
   { email: 'ghada@samboza.family', who: 'Ghada', role: 'Viewer', kpis: 4 },
@@ -133,6 +137,35 @@ for (const person of PEOPLE) {
       (await page.text('.page'))?.split('\n').join(' · ').slice(0, 110))
   }
 
+  if (seen.nav.includes('/car')) {
+    await page.click('a[href="/car"]')
+    const ok = await page.wait(
+      `document.querySelectorAll('.kpi').length === 4 && !document.querySelector('.kpi .v.muted')`)
+    const view = await page.ev(`({
+      confirm: [...document.querySelectorAll('input[type=checkbox]')].length,
+      figures: [...document.querySelectorAll('.kpi .k')].map(k => k.textContent).join(' | '),
+    })`)
+    check(`${person.who}: the Car screen shows what the driver is holding`, ok, view.figures)
+    // Ghada watches; only Abdo can pick days to settle.
+    check(`${person.who}: only the admin can select days to settle`,
+      person.role === 'Admin' || view.confirm === 0, `${view.confirm} checkboxes`)
+  }
+
+  if (seen.nav.includes('/myearnings')) {
+    await page.click('a[href="/myearnings"]')
+    const ok = await page.wait(
+      `document.querySelectorAll('.kpi').length === 4 && !document.querySelector('.kpi .v.muted')`)
+    check(`${person.who}: My Earnings shows his share and what he holds`, ok,
+      oneLine(await page.text('.kpis'), 130))
+  }
+
+  if (seen.nav.includes('/carday')) {
+    await page.click('a[href="/carday"]')
+    const ok = await page.wait(`!!document.querySelector('form.form input[inputmode=decimal]')`)
+    check(`${person.who}: Record a Day renders the form`, ok,
+      oneLine(await page.text('.cardhead'), 60))
+  }
+
   // Typing a URL the role has no business on. The nav hides it and the
   // database refuses it; neither should end in a blank screen.
   await page.go(APP + 'approvals')
@@ -218,7 +251,64 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
   await page.dispose()
 }
 
+/* ------------------------------- Joe records a losing day, Abdo settles it */
+{
+  const page = await browser.page()
+  await signIn(page, APP, 'joe@samboza.family')
+  await page.click('a[href="/carday"]')
+  await page.wait(`!!document.querySelector('form.form input[inputmode=decimal]')`)
+
+  // A quiet day with a fine on it: 50 EGP taken, 250 of ticket. D10 says the
+  // loss is shared, not floored at zero.
+  await page.ev(type('form.form input[inputmode=decimal]', '50'))
+  await page.ev(`[...document.querySelectorAll('.btn')]
+    .find(b => b.textContent.includes('Add a cost'))?.click(), true`)
+  await page.wait(`document.querySelectorAll('.costrow').length === 1`)
+  await page.ev(type('.costrow select.input', 'ticket', 'select'))
+  await page.ev(type('.costrow input[inputmode=decimal]', '250'))
+
+  // The preview is the thing worth checking: it is computed in JavaScript and
+  // has to agree with what Postgres will store, including on a negative half.
+  const preview = await page.ev(`(() => {
+    const lines = [...document.querySelectorAll('.splitline')]
+      .map(l => l.textContent.trim());
+    return lines.join(' | ');
+  })()`)
+  check('Joe sees the loss shared before he submits',
+    /−EGP 200/.test(preview) && /−EGP 67/.test(preview) && /−EGP 100/.test(preview),
+    preview)
+
+  await page.ev(`document.querySelector('form.form').requestSubmit()`)
+  const done = await page.wait(`!!document.querySelector('.donemark')`)
+  check('…and records it', done,
+    done ? '' : await page.ev(`document.querySelector('.errmsg')?.textContent ?? '(no message)'`))
+
+  const { data: day } = await admin.from('car_days').select('*').is('voided_at', null).single()
+  check('…stored negative, split exactly, computed by the database',
+    day?.net_egp === -20000 &&
+    day.driver_egp + day.family_egp + day.marwa_egp === -20000 &&
+    day.family_egp === -10000,
+    `net ${day?.net_egp} → Joe ${day?.driver_egp} · family ${day?.family_egp} · Marwa ${day?.marwa_egp}`)
+
+  const { data: due } = await admin.from('account_balances').select('balance')
+    .eq('system_key', 'due_from_driver').single()
+  check('…and the family share reached the ledger, not just the day table',
+    Number(due.balance) === -10000, `due_from_driver = ${due.balance}`)
+  await page.dispose()
+}
+
 /* ------------------------------------------------------------- cleanup -- */
+{
+  const { data: days } = await admin.from('car_days').select('id,journal_id')
+  for (const d of days ?? []) {
+    await admin.from('car_expenses').delete().eq('car_day_id', d.id)
+    await admin.from('car_days').delete().eq('id', d.id)
+    if (d.journal_id) {
+      await admin.from('entries').delete().eq('journal_id', d.journal_id)
+      await admin.from('journals').delete().eq('id', d.journal_id)
+    }
+  }
+}
 await admin.from('member_expenses').delete().eq('description', MEMO)
 const { data: js } = await admin.from('journals').select('id').eq('memo', MEMO)
 for (const j of js ?? []) {

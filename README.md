@@ -155,7 +155,7 @@ and shared in the same ratios as a profit (D10). It is not floored at zero.
 |---|---|
 | Phase 0 — schema, RLS, tests | **done** · 9 migrations, 39 pgTAP assertions, green in CI |
 | Phase 1 — auth and the shell | **done** · five people sign in, each sees their own navigation |
-| Phase 2 — the money | **steps 1–3 of 8 done** · the ledger, allowances, approvals |
+| Phase 2 — the money | **steps 1–4 of 8 done** · the ledger, allowances, approvals, the car |
 | The glass restyle | after the screens exist, as planned |
 
 What works today: Abdo records income and expense straight into the double-entry
@@ -164,9 +164,14 @@ send him. A member records against their allowance and sees what is left of it.
 History stitches the ledger, member submissions and car days into one filterable
 feed, and shows each person only what the database lets them see.
 
-Still to come, in this order: **the car** (Joe's daily submission and the
-handovers Abdo confirms), remittances, loans, the four reports, offline sync —
-and the approval notification, without which the queue quietly rots.
+Joe records each day he drives and each day he rests, enters the takings and
+the costs, and sees his third worked out before he submits. The family's share
+becomes money he is holding from the moment it is earned; Abdo confirms a
+handover when the cash is actually in his hand, and a short one is carried
+rather than written off.
+
+Still to come, in this order: remittances, loans, the four reports, offline
+sync — and the approval notification, without which the queue quietly rots.
 
 ### Before real money goes in
 

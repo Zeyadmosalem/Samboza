@@ -184,7 +184,27 @@ Build in this order. Each step is demoable to the family on its own.
    the direct/indirect class he chooses himself, the split (which may be
    negative), and **handovers**: Joe records days, Abdo confirms receipt when the
    cash is actually in his hand, covering whatever span it covers. Until then the
-   money sits in `due_from_driver` and is not counted as cash.
+   money sits in `due_from_driver` and is not counted as cash. **DONE**, and it
+   closed a hole the schema had carried since Phase 0:
+
+   - **Nothing ever debited `due_from_driver`.** `confirm_handover` cleared a
+     receivable that was never created, so the first handover drove it negative
+     — the books said the family owed Joe the money he had just handed over —
+     and "With the driver" read zero however many days he recorded. A day now
+     posts `due_from_driver +family_egp / car_income −family_egp` the moment it
+     is recorded, which is what makes D12's carry work: the balance IS the
+     amount still owed. (0012)
+   - **The client no longer computes the split.** A day was inserted directly
+     with a net and three shares the app worked out, and `cd_net_is_derived`
+     only ever compared the day's own columns to each other — so
+     `direct_egp` could disagree with the costs itemised beside it.
+     `record_car_day()` derives both from the same lines.
+   - **A day is voided, never edited.** Joe will mistype one. The journal is
+     reversed and the date freed, so the correction is on the record.
+   - **Marwa's share stays out of the family's books**, because Joe settles it
+     with her — which is what `confirm_handover` summing `family_egp` alone has
+     always assumed. If it should route through Abdo instead, that is one more
+     account and one more line. **Worth confirming with the family.**
 5. **Remittances** — multi-currency in, rate stored with the record.
 6. **Loans.**
 7. **Reports** — the four charts.

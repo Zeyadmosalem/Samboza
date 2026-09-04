@@ -10,8 +10,11 @@ import History from './screens/History'
 import Allowance from './screens/Allowance'
 import MySpending from './screens/MySpending'
 import Approvals from './screens/Approvals'
+import CarDay from './screens/CarDay'
+import Car from './screens/Car'
+import MyEarnings from './screens/MyEarnings'
 
-/** Steps 1–3 of Phase 2 are real. The rest still hang from the shell as
+/** Steps 1–4 of Phase 2 are real. The rest still hang from the shell as
  *  placeholders, in the order the plan builds them. */
 const BUILT: Record<string, () => JSX.Element> = {
   dashboard: Dashboard,
@@ -20,6 +23,9 @@ const BUILT: Record<string, () => JSX.Element> = {
   allowance: Allowance,
   myspending: MySpending,
   approvals: Approvals,
+  carday: CarDay,
+  car: Car,
+  myearnings: MyEarnings,
 }
 
 const SCREENS = [

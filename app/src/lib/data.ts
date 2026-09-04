@@ -100,6 +100,10 @@ export interface CarDay {
   marwa_egp: number
   status: 'recorded' | 'settled' | 'off'
   submitted_by: string
+  journal_id: string | null
+  voided_at: string | null
+  void_reason: string | null
+  handover_id: string | null
 }
 
 export interface Balance {
@@ -176,12 +180,15 @@ export async function memberExpenses(q: FeedQuery & { status?: string }) {
   return (data ?? []) as MemberExpense[]
 }
 
-export async function carDays(q: FeedQuery) {
+export async function carDays(q: FeedQuery & { includeVoided?: boolean }) {
   let sel = supabase
     .from('car_days')
     .select('*')
     .eq('family_id', q.familyId)
     .order('drive_date', { ascending: false })
+  // A voided day is a correction, not history to re-read. Its journal was
+  // reversed, so counting it again would double what Joe appears to owe.
+  if (!q.includeVoided) sel = sel.is('voided_at', null)
   if (q.from) sel = sel.gte('drive_date', q.from)
   if (q.to) sel = sel.lte('drive_date', q.to)
   const { data, error } = await sel.range(q.offset ?? 0, (q.offset ?? 0) + (q.limit ?? 50) - 1)
@@ -377,4 +384,117 @@ export async function decideSubmission(id: string, status: 'approved' | 'rejecte
   })
   if (error) throw error
   return data as boolean
+}
+
+/* -------------------------------------------------------------------- car */
+
+export type CostClass = 'direct' | 'indirect'
+export const COST_LABELS = ['fuel', 'tolls', 'permit', 'admin', 'ticket', 'other'] as const
+export type CostLabel = typeof COST_LABELS[number]
+
+/** The label only SUGGESTS a class (D2). Joe sets it, and can override this. */
+export const SUGGESTED_CLASS: Record<CostLabel, CostClass> = {
+  fuel: 'direct', tolls: 'direct',
+  permit: 'indirect', admin: 'indirect', ticket: 'indirect', other: 'indirect',
+}
+
+export interface CostLine {
+  label: CostLabel
+  class: CostClass
+  amount_egp: number
+  description?: string | null
+}
+
+export interface CarExpense extends CostLine { id: string; car_day_id: string }
+
+export interface Handover {
+  id: string
+  received_on: string
+  amount_egp: number
+  counted_egp: number
+  note: string | null
+}
+
+/**
+ * What the split WILL be, for the screen only — `record_car_day` computes the
+ * real one in SQL and that is what gets stored.
+ *
+ * Rounding is half away from zero, matching Postgres. `Math.round` is half
+ * UP, which agrees on every positive value and disagrees on exact negative
+ * halves — and days can be negative (D10), so the two rules differ on roughly
+ * one losing day in twelve. Getting this wrong would show Joe one number and
+ * store another.
+ */
+const roundAway = (x: number) => Math.sign(x) * Math.round(Math.abs(x))
+export function splitPreview(net: number) {
+  const driver = roundAway(net / 3)
+  const family = roundAway((net - driver) * 0.75)
+  return { driver, family, marwa: (net - driver) - family }
+}
+
+export async function recordCarDay(args: {
+  familyId: string
+  driveDate: string
+  worked: boolean
+  gross?: number
+  expenses?: CostLine[]
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('record_car_day', {
+    p_family: args.familyId,
+    p_drive_date: args.driveDate,
+    p_worked: args.worked,
+    p_gross: args.worked ? (args.gross ?? 0) : 0,
+    p_expenses: args.worked ? (args.expenses ?? []) : [],
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function voidCarDay(id: string, reason: string) {
+  const { data, error } = await supabase.rpc('void_car_day', { p_day: id, p_reason: reason })
+  if (error) throw error
+  return data as boolean
+}
+
+export async function confirmHandover(args: {
+  familyId: string
+  dayIds: string[]
+  receivedOn: string
+  countedEgp: number
+  note?: string | null
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('confirm_handover', {
+    p_family: args.familyId,
+    p_day_ids: args.dayIds,
+    p_received_on: args.receivedOn,
+    p_counted_egp: args.countedEgp,
+    p_note: args.note ?? null,
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function handovers(familyId: string, limit = 10) {
+  const { data, error } = await supabase
+    .from('car_handovers')
+    .select('id,received_on,amount_egp,counted_egp,note')
+    .eq('family_id', familyId)
+    .order('received_on', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as Handover[]
+}
+
+export async function carExpensesFor(dayIds: string[]) {
+  if (!dayIds.length) return []
+  const { data, error } = await supabase
+    .from('car_expenses')
+    .select('id,car_day_id,label,class,amount_egp,description')
+    .in('car_day_id', dayIds)
+  if (error) throw error
+  return (data ?? []) as CarExpense[]
 }
