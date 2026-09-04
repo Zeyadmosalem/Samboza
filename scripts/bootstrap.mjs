@@ -166,22 +166,49 @@ async function main() {
     log(`account ${a.key}`)
   }
 
-  const { data: accounts } = await db.from('accounts').select('*').eq('family_id', family.id)
-  const carIncome = accounts.find(a => a.system_key === 'car_income')
+  /* ---- categories, each with its OWN account -------------------------
+     A category is the human-facing label; the account is where the money
+     actually lands. Pointing every category at one account would have
+     recorded rent as car income and quietly wrecked every report, so this
+     also REPAIRS an existing row whose account is of the wrong kind. */
+  const slug = (name) => 'cat:' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
 
-  /* ---- categories ---------------------------------------------------- */
   for (const c of CATEGORIES) {
-    const { data: has } = await db
-      .from('categories').select('id').eq('family_id', family.id).eq('name_en', c.en).maybeSingle()
-    if (has) continue
-    const { error } = await db.from('categories').insert({
-      family_id: family.id, name_en: c.en, name_ar: c.ar, kind: c.kind,
-      account_id: carIncome.id, colour: c.colour,
-      needs_recipient: c.needs_recipient ?? false, is_default: true,
-    })
-    if (error) throw error
-    log(`category ${c.en}`)
+    const key = slug(c.en)
+
+    let { data: account } = await db
+      .from('accounts').select('*').eq('family_id', family.id).eq('system_key', key).maybeSingle()
+    if (!account) {
+      const { data, error } = await db.from('accounts')
+        .insert({ family_id: family.id, system_key: key, kind: c.kind, name: c.en })
+        .select().single()
+      if (error) throw error
+      account = data
+      log(`account ${key}`)
+    }
+
+    const { data: existing } = await db
+      .from('categories').select('id, account_id')
+      .eq('family_id', family.id).eq('name_en', c.en).maybeSingle()
+
+    if (!existing) {
+      const { error } = await db.from('categories').insert({
+        family_id: family.id, name_en: c.en, name_ar: c.ar, kind: c.kind,
+        account_id: account.id, colour: c.colour,
+        needs_recipient: c.needs_recipient ?? false, is_default: true,
+      })
+      if (error) throw error
+      log(`category ${c.en} -> ${key}`)
+    } else if (existing.account_id !== account.id) {
+      const { error } = await db.from('categories')
+        .update({ account_id: account.id }).eq('id', existing.id)
+      if (error) throw error
+      log(`category ${c.en} REPOINTED to ${key}`)
+    }
   }
+
+  const { data: accounts } = await db.from('accounts').select('*').eq('family_id', family.id)
+  void accounts
 
   /* ---- allowance rates ----------------------------------------------- */
   const { data: people } = await db.from('people').select('*').eq('family_id', family.id)
