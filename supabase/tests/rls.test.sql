@@ -266,8 +266,11 @@ select is(
      join pg_namespace n on n.oid = c.relnamespace
     where c.relkind = 'v'
       and n.nspname = 'public'
+      -- Postgres stores whatever spelling the ALTER used: 'on' from
+      -- SET (security_invoker = on), 'true' from = true. Accept either,
+      -- or this guard fails on a view that is correctly locked down.
       and not coalesce((
-        select option_value = 'true'
+        select lower(option_value) in ('true','on','1')
           from pg_options_to_table(c.reloptions)
          where option_name = 'security_invoker'
       ), false)),
