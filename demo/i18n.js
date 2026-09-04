@@ -168,6 +168,22 @@ window.I18N = (function () {
     err_bad_credentials:'That email and password do not match',
     err_no_access:'That account cannot sign in',
 
+    /* Ghada's personal book */
+    nav_mymoney:'My Money', nav_mymonth:'My Month',
+    nav_group_view:'The family', nav_group_own:'My money',
+    mymoney_sub:'Your own money, kept apart from the family books. Nobody else can see this — not even Abdo.',
+    mymonth_sub:'Your own spending month by month.',
+    private_note:'Private to you',
+    p_salary:'Salary', p_remit:'Sent home', p_rent:'Rent', p_food:'Food',
+    p_transport:'Transport', p_phone:'Phone', p_other:'Other',
+    n_p_salary:'Monthly salary', n_p_rent:'Rent', n_p_grocery:'Groceries',
+    n_p_transport:'Transport', n_p_phone:'Phone and internet',
+    n_p_eating_out:'Eating out', n_p_personal:'Personal',
+    my_income:'Earned', my_outgoings:'Spent', my_kept:'Kept', sent_home:'Sent home',
+    this_month_only:'This month', per_month:'Per month', month:'Month',
+    add_personal:'Record it', personal_saved:'Recorded',
+    family_view_note:'You are viewing the family books. You cannot change anything here — and nothing you record in My Money touches them.',
+
     /* settings */
     set_title:'Settings', set_cats:'Categories', set_cats_sub:'Abdo can add to the default set.',
     set_fx:'Exchange rates', set_fx_sub:'Entered per remittance and stored with the record.',
@@ -364,6 +380,22 @@ window.I18N = (function () {
     demo_password:'كلمة المرور لكلهم:',
     err_bad_credentials:'البريد وكلمة المرور مش متطابقين',
     err_no_access:'الحساب ده مش مسموح له بالدخول',
+
+    /* Ghada's personal book */
+    nav_mymoney:'فلوسي', nav_mymonth:'شهري',
+    nav_group_view:'العائلة', nav_group_own:'فلوسي',
+    mymoney_sub:'فلوسك انتي، منفصلة تمامًا عن دفاتر العائلة. محدش يقدر يشوفها — ولا حتى عبده.',
+    mymonth_sub:'مصروفاتك شهر بشهر.',
+    private_note:'خاص بيكي',
+    p_salary:'المرتب', p_remit:'المُرسل للبيت', p_rent:'الإيجار', p_food:'الأكل',
+    p_transport:'المواصلات', p_phone:'التليفون', p_other:'أخرى',
+    n_p_salary:'مرتب الشهر', n_p_rent:'الإيجار', n_p_grocery:'بقالة',
+    n_p_transport:'مواصلات', n_p_phone:'تليفون وإنترنت',
+    n_p_eating_out:'أكل بره', n_p_personal:'مصاريف شخصية',
+    my_income:'الداخل', my_outgoings:'المنصرف', my_kept:'المتبقي', sent_home:'المُرسل للبيت',
+    this_month_only:'الشهر ده', per_month:'في الشهر', month:'الشهر',
+    add_personal:'تسجيل', personal_saved:'تم التسجيل',
+    family_view_note:'انتي بتشوفي دفاتر العائلة. مش هتقدري تغيري حاجة هنا — ومفيش حاجة بتسجليها في فلوسي بتأثر عليها.',
 
     /* settings */
     set_title:'الإعدادات', set_cats:'التصنيفات', set_cats_sub:'عبده يقدر يضيف على المجموعة الافتراضية.',

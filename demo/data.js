@@ -334,6 +334,67 @@ window.DEMO = (function () {
     if (batch.length) confirmHandover(batch, cutoff, 'abdo');
   })();
 
+  /* ---- Ghada's personal book (§3.7) ------------------------------------
+     A THIRD kind of ledger, and the distinction matters:
+
+       family ledger    money the family holds and spends together
+       member sub-ledger  an allowance the family gave, spent by the member
+       personal book    a person's OWN money, which was never family money
+
+     Ghada earns abroad. Her salary, her rent in Riyadh, her groceries there
+     — none of it is the family's business or the family's money. She views
+     the family books and contributes nothing to them; this is the other
+     direction, and it is private to her.
+
+     The one place the two books touch is a remittance. From the family's
+     side it is income; from hers it is the largest thing she spends. Same
+     event, two books, each recording its own half — which is exactly how
+     double-entry works, applied across ledgers rather than within one. --- */
+  const PERSONAL_CATEGORIES = [
+    { id:'p_salary',    kind:'income',  color:'#1baf7a', dark:'#199e70' },
+    { id:'p_remit',     kind:'expense', color:'#2a78d6', dark:'#3987e5', major:true },
+    { id:'p_rent',      kind:'expense', color:'#eb6834', dark:'#d95926', major:true },
+    { id:'p_food',      kind:'expense', color:'#eda100', dark:'#c98500', major:true },
+    { id:'p_transport', kind:'expense', color:'#e87ba4', dark:'#d55181', major:true },
+    { id:'p_phone',     kind:'expense', color:'#4a3aa7', dark:'#9085e9', major:true },
+    { id:'p_other',     kind:'expense', color:'#8a9490', dark:'#9aa4a0' }
+  ];
+
+  // She lives and is paid in SAR, so her book is kept in SAR. Recording her
+  // rent in EGP would be a lie about what she actually paid.
+  const mother = people.find(x => x.id === 'mother');
+  mother.personalCurrency = 'SAR';
+
+  const personalTx = [];
+  function addPersonal(o) {
+    const t = Object.assign({ id: uid('px'), person:'mother', currency:'SAR' }, o);
+    personalTx.push(t);
+    return t;
+  }
+
+  const personalPlan = [
+    ['p_rent',      2500, 1,  'n_p_rent'],
+    ['p_food',      1150, 4,  'n_p_grocery'],
+    ['p_transport',  380, 7,  'n_p_transport'],
+    ['p_phone',      150, 11, 'n_p_phone'],
+    ['p_food',       420, 17, 'n_p_eating_out'],
+    ['p_other',      260, 22, 'n_p_personal']
+  ];
+  for (let i = 0; i < 7; i++) {
+    const m = 3 + i;
+    const lastDay = m === 9 ? 1 : 28;
+    addPersonal({ type:'income', cat:'p_salary', amount:9000, date:d(m,1), note:'n_p_salary' });
+    personalPlan.forEach(function (r, k) {
+      if (r[2] > lastDay) return;
+      addPersonal({ type:'expense', cat:r[0], amount: r[1] + drift[(i + k) % 6], date:d(m, r[2]), note:r[3] });
+    });
+  }
+  // The remittances, from her side of the same event.
+  remittances.forEach(function (r) {
+    addPersonal({ type:'expense', cat:'p_remit', amount:r.amountOriginal, currency:r.currency,
+                  date:r.date, note:r.visit, familyRef:r.id });
+  });
+
   /* ---- loans (§3.5) --------------------------------------------------- */
   const loans = [{
     id:'l1', direction:'borrowed', lender:'Hazem', amount:25000, currency:'EGP',
@@ -387,5 +448,5 @@ window.DEMO = (function () {
            DEFAULT_KIND, EXPENSE_LABELS, kindOf, settleDay, dayOff, dayTaken,
            handovers, confirmHandover,
            loans, allowances, allowanceRates, rateOn,
-           memberTx, add, uid };
+           memberTx, personalTx, PERSONAL_CATEGORIES, addPersonal, add, uid };
 })();

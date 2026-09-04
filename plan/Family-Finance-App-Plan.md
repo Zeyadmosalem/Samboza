@@ -16,7 +16,7 @@ A private ledger for one family. The mother earns abroad and sends money home; A
 
 | Person | Role in family | App role | Permissions |
 |---|---|---|---|
-| **Ghada** (mother) | Breadwinner — works abroad, main income source | **Viewer / Auditor** | Read-only. Full visibility of all income, expenses, allowances, loans, car ledger and reports. Cannot add or edit. |
+| **Ghada** (mother) | Breadwinner — works abroad, main income source | **Viewer / Auditor** | Two views. Of the family books: read-only, full visibility, cannot add or edit anything. Of her **own** money (§3.6): a private personal book she records into daily and reviews monthly, which never touches the family ledger. |
 | **Abdo** (big brother) | Accountant | **Admin** | Full access. Records and edits every transaction, manages categories, disburses allowances, registers loans, runs the car settlement, sets FX rates, approves member submissions. |
 | **Zeyad** (son) | Allowance recipient | **Member** | Submits his own expenses against his allowance; sees his own balance, history and spending-habit charts. No access to other members' detail. |
 | **Rewan** (daughter) | Allowance recipient | **Member** | Same as Zeyad. |
@@ -155,7 +155,47 @@ Loans are registered separately from ordinary income so the family can see what 
 
 Properties: **lender name (required)**, **amount (required)**, description (optional), currency, date taken, direction (borrowed / lent out), status (outstanding / partially repaid / repaid), repayments (date + amount), balance remaining.
 
-### 3.6 Currency
+### 3.6 Personal books
+
+Ghada earns abroad and sends money home. In the family books she is a
+**viewer**: she watches everything and contributes nothing to them. But she also
+wants to track her own money — her salary, her rent in Riyadh, her groceries
+there — and none of that is family money or the family's business.
+
+So she gets **two views**, and they must never blur:
+
+| View | What it is |
+|---|---|
+| **The family** | Read-only. Dashboard, remittances, allowances, car, loans, history, reports. She can see every figure and change none of them. |
+| **My money** | Her own book. She records daily, reviews monthly. Private to her. |
+
+This is a **third kind of ledger**, and the distinction is worth stating because
+two of them already exist and they are not the same thing:
+
+- the **family ledger** — money the family holds and spends together
+- a **member sub-ledger** — an allowance the family gave, spent by the member.
+  Still family money, which is why it needs approval (D5).
+- a **personal book** — a person's own money, which was never family money.
+  No approval, because it is nobody else's business.
+
+**Kept in her own currency.** She is paid in SAR and lives in SAR; recording her
+rent in EGP would misstate what she actually paid. Her book is SAR, with a
+per-row currency so an occasional USD expense is honest.
+
+**Private, including from Abdo.** He is the family accountant, not hers. A
+personal book is readable only by the person it belongs to — this is an RLS
+policy, not a UI decision.
+
+**The one place the books touch is a remittance.** From the family's side it is
+income; from hers it is the largest thing she spends. Same event, two books,
+each recording its own half — which is what double-entry does within a ledger,
+applied across two of them. Nothing else crosses: her spending never appears in
+family totals, family History, or any family report.
+
+> Any person could be given a personal book later — nothing about it is specific
+> to Ghada or to the viewer role. Today only she has one.
+
+### 3.7 Currency
 
 - **Internal ledger currency: EGP.** All internal transactions, reports and balances are in EGP.
 - Remittances from the mother arrive in **EGP, SAR or USD**.
@@ -297,6 +337,8 @@ See `Family-Finance-App-Mockups.html` for visuals.
 | **Remittance** | Abdo (Mother views) | Log a visit remittance: amount, currency, rate, EGP result |
 | **Allowance** | Abdo (recipients view own) | Recipients list, amounts, mark as paid, per-recipient balance |
 | **My Spending** | Zeyad, Rewan | Allowance balance, own history, habit charts |
+| **My Money** | Ghada | Her own book — record daily, recent activity, private (§3.6) |
+| **My Month** | Ghada | Her own spending month by month, with what she sent home |
 | **Car** | Abdo (Mother views) | Gross income, car expenses, computed uncle / family / Marwa splits, settle |
 | **Loans** | Abdo (Mother views) | Lender, amount, description, status, repayments |
 | **History** | all (scoped) | Searchable, filterable, grouped by day |

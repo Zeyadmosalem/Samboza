@@ -269,6 +269,64 @@ A sub-ledger against the member's `wallet:` account. It never touches the family
 ledger — the family already expensed the disbursement, so counting the member's
 spending again would double-count it. **Only `approved` rows move the balance.**
 
+### Personal books (§3.6)
+
+A person's **own** money, which was never family money. Not the family ledger,
+and not a member sub-ledger either — that one tracks an allowance the family
+gave, which is why it needs approval. This needs none, because it is nobody
+else's business.
+
+```sql
+create table personal_entries (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references families on delete cascade,
+  person_id   uuid not null references people,
+  direction   text not null check (direction in ('in','out')),
+  category    text not null,          -- own list, not the family's categories
+  amount      bigint not null check (amount > 0),
+  currency    char(3) not null,       -- she lives in SAR; her book is SAR
+  occurred_on date not null,
+  description text,
+  family_ref  uuid references remittances,   -- the one place the books touch
+  client_uuid uuid unique,
+  created_at  timestamptz not null default now()
+);
+
+create index on personal_entries (person_id, occurred_on);
+```
+
+**No `account_id` and no `journal_id`.** This is deliberately *outside* the
+family's double-entry ledger — it is a different entity's money. Putting it in
+`entries` would make it reachable by a family balance query, which is precisely
+what must never happen.
+
+`family_ref` records the one event that appears in both books: a remittance is
+income to the family and the largest outgoing in her own book. Same event, two
+books, each recording its own half.
+
+**Private, including from the admin:**
+
+```sql
+alter table personal_entries enable row level security;
+
+-- Not "admin can see everything". Abdo is the family's accountant, not hers.
+create policy pe_owner_only on personal_entries for all
+  using      (person_id = (my_person(family_id)).id)
+  with check (person_id = (my_person(family_id)).id);
+```
+
+That policy is the whole feature. If it ever grows an `or my_role(...) = 'admin'`
+the book stops being personal.
+
+Add to the RLS suite:
+
+| As | Action | Expected |
+|---|---|---|
+| Abdo | read Ghada's `personal_entries` | **DENY** |
+| Ghada | read own `personal_entries` | ALLOW |
+| Ghada | insert into `entries` (family ledger) | **DENY** |
+| Ghada | read `entries` | ALLOW (she is the auditor) |
+
 ---
 
 ## 4. The car

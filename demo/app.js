@@ -16,7 +16,8 @@
     tables: {},
     day: null,           // Joe's in-progress day submission
     loginEmail: '',
-    loginError: null
+    loginError: null,
+    pCat: null
 
   };
 
@@ -115,14 +116,19 @@
     moon:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/>',
     carday:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18M12 13.5v5M9.5 16h5"/>',
     myearnings:'<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v11c0 1.7 3.1 3 7 3s7-1.3 7-3v-11"/><path d="M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
-    approvals:'<path d="M20 11V6.5A2.5 2.5 0 0 0 17.5 4h-11A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H12"/><path d="M15 18l2.5 2.5L22 16"/>'
+    approvals:'<path d="M20 11V6.5A2.5 2.5 0 0 0 17.5 4h-11A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H12"/><path d="M15 18l2.5 2.5L22 16"/>',
+    mymoney:'<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="2.6"/><path d="M6 10v5M18 10v5"/>',
+    mymonth:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M7.5 14h2M11 14h2M14.5 14h2M7.5 17h2M11 17h2"/>'
   };
   const icon = (k, cls) => '<svg class="' + (cls || 'ico') + '" viewBox="0 0 24 24">' + ICON[k] + '</svg>';
 
   /* ── navigation ────────────────────────────────────────────────────── */
+  /* Ghada has two books and they must never blur into each other. Her nav
+     says so out loud: one group she can only WATCH, one that is her own. */
   const NAV = [
     { group:'nav_group_money',  items:['dashboard','add','carday','remittance','allowance','car','loans'] },
     { group:'nav_group_family', items:['myspending','myearnings','approvals','history','reports','people'] },
+    { group:'nav_group_own',    items:['mymoney','mymonth'] },
     { group:'nav_group_admin',  items:['settings'] }
   ];
   const ACCESS = {
@@ -131,6 +137,7 @@
     remittance:['admin','viewer'], allowance:['admin','viewer'], car:['admin','viewer'],
     loans:['admin','viewer'], myspending:['member'], approvals:['admin'],
     history:['admin','member','viewer'], reports:['admin','viewer'],
+    mymoney:['viewer'], mymonth:['viewer'],
     people:['admin'], settings:['admin']
   };
   const allowed = s => ACCESS[s].indexOf(state.user.role) >= 0;
@@ -199,10 +206,16 @@
   /* ── shell ─────────────────────────────────────────────────────────── */
   function renderShell() {
     const u = state.user;
-    const nav = NAV.map(g => {
+    // Ghada sees two groups, not three: what she watches, and what is hers.
+    const groups = can.viewer()
+      ? [{ group:'nav_group_view', items:['dashboard','remittance','allowance','car','loans','history','reports'] },
+         { group:'nav_group_own',  items:['mymoney','mymonth'] }]
+      : NAV;
+    const nav = groups.map(g => {
       const items = g.items.filter(allowed);
       if (!items.length) return '';
-      return '<div class="navgroup">' + esc(t(g.group)) + '</div>' + items.map(s =>
+      const label = g.group;
+      return '<div class="navgroup">' + esc(t(label)) + '</div>' + items.map(s =>
         '<button class="navitem ' + (state.screen === s ? 'on' : '') + '" data-action="go" data-s="' + s + '">' +
           icon(s) + '<span>' + esc(t('nav_' + s)) + '</span>' +
           (s === 'approvals' && pendingTx().length
@@ -234,12 +247,13 @@
 
     const page = document.getElementById('page');
     const screen = SCREENS[state.screen] || SCREENS.dashboard;
-    page.innerHTML = (can.viewer() ? readonlyBanner() : '') + screen.html();
+      const ownBook = state.screen === 'mymoney' || state.screen === 'mymonth';
+    page.innerHTML = (can.viewer() && !ownBook ? readonlyBanner() : '') + screen.html();
     if (screen.after) screen.after(page);
   }
 
   const readonlyBanner = () =>
-    '<div class="banner">' + icon('info') + '<span>' + esc(t('readonly_banner')) + '</span></div>';
+    '<div class="banner">' + icon('info') + '<span>' + esc(t('family_view_note')) + '</span></div>';
 
   /* ── shared fragments ──────────────────────────────────────────────── */
   function txRow(x) {
@@ -1111,6 +1125,144 @@
     }
   };
 
+  /* ------------------------------------------------------------------
+     Ghada's personal book. Her own money, in her own currency, private to
+     her — it never reaches the family ledger, the family History or any
+     family report. She views the family books and contributes nothing to
+     them; this is the other direction entirely.
+  ------------------------------------------------------------------ */
+  const pcat  = id => (D.PERSONAL_CATEGORIES.find(c => c.id === id) || {});
+  const pname_= id => t(id);
+  const pcur  = () => state.user.personalCurrency || 'EGP';
+  const pmoney = (v, cur) => I.money(v, { currency: cur || pcur() });
+  const mine_  = () => D.personalTx.filter(x => x.person === state.user.id);
+
+  function pTotals(list) {
+    const inc = list.filter(x => x.type === 'income').reduce((s, x) => s + x.amount, 0);
+    const out = list.filter(x => x.type === 'expense' && x.currency === pcur())
+                    .reduce((s, x) => s + x.amount, 0);
+    const foreign = list.filter(x => x.type === 'expense' && x.currency !== pcur());
+    return { inc, out, kept: inc - out, foreign };
+  }
+
+  function pSlices(list) {
+    const map = {};
+    list.filter(x => x.type === 'expense' && x.currency === pcur())
+        .forEach(x => { map[x.cat] = (map[x.cat] || 0) + x.amount; });
+    return Object.keys(map)
+      .map(k => ({ label: t(k), value: map[k], color: hue(pcat(k)) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }
+
+  const pRow = x =>
+    '<div class="tx"><div class="dot" style="background:' + hue(pcat(x.cat)) + '">' +
+        esc(t(x.cat).slice(0, 2)) + '</div>' +
+      '<div class="m"><div class="n">' + esc(t(x.note) || x.note) + '</div>' +
+        '<div class="w"><span>' + esc(t(x.cat)) + '</span><span>' + esc(I.date(x.date)) + '</span>' +
+          (x.familyRef ? '<span>' + esc(t('sent_home')) + '</span>' : '') + '</div></div>' +
+      '<div class="amt ' + (x.type === 'income' ? 'plus' : 'minus') + '">' +
+        (x.type === 'income' ? '+' : '\u2212') + pmoney(x.amount, x.currency) + '</div></div>';
+
+  /* View 2a — day to day */
+  SCREENS.mymoney = {
+    html: function () {
+      const list = mine_().sort(byDateDesc);
+      const win  = list.filter(x => inWindow(x, 30));
+      const tot  = pTotals(win);
+      const cats = D.PERSONAL_CATEGORIES.filter(c => c.kind === 'expense');
+
+      return '<div class="banner">' + icon('info') + '<span>' + esc(t('mymoney_sub')) + '</span></div>' +
+        '<div class="grid k4">' +
+          '<div class="card hero kpi"><div class="k">' + esc(t('my_kept')) + ' \u00b7 ' + esc(t('this_month_only')) + '</div>' +
+            '<div class="v">' + pmoney(tot.kept) + '</div>' +
+            '<div class="w">' + esc(t('private_note')) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('my_income')) + '</div>' +
+            '<div class="v plus">' + pmoney(tot.inc) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('my_outgoings')) + '</div>' +
+            '<div class="v minus">' + pmoney(tot.out) + '</div></div>' +
+          '<div class="card kpi"><div class="k">' + esc(t('sent_home')) + '</div>' +
+            '<div class="v">' + (tot.foreign.length || win.some(x => x.cat === 'p_remit')
+              ? win.filter(x => x.cat === 'p_remit').map(x => pmoney(x.amount, x.currency)).join(', ') || '\u2014'
+              : '\u2014') + '</div></div>' +
+        '</div>' +
+
+        '<div class="grid split" style="margin-top:16px">' +
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('add_personal')) + '</h2></div></div>' +
+            '<div class="bigamount"><div class="cur">' + esc(pcur()) + '</div>' +
+              '<input id="pAmount" class="amtin" inputmode="decimal" placeholder="0"></div>' +
+            '<div class="errmsg" id="pErr" hidden></div>' +
+            '<div class="field" style="margin-top:10px"><label>' + esc(t('category')) + '</label>' +
+              '<div class="catgrid">' + cats.map(c =>
+                '<button class="catbtn ' + (state.pCat === c.id ? 'on' : '') + '" data-action="pCat" data-c="' + c.id + '">' +
+                  '<i style="background:' + hue(c) + '"></i>' + esc(t(c.id)) + '</button>').join('') + '</div></div>' +
+            '<div class="grid k2" style="margin-top:14px">' +
+              '<div class="field"><label>' + esc(t('date')) + '</label>' +
+                '<input id="pDate" class="input" type="date" value="2026-09-01" max="2026-09-01"></div>' +
+              '<div class="field"><label>' + esc(t('currency')) + '</label>' +
+                '<select id="pCur" class="input">' + ['SAR','USD','EGP'].map(c =>
+                  '<option ' + (c === pcur() ? 'selected' : '') + '>' + c + '</option>').join('') + '</select></div>' +
+            '</div>' +
+            '<div class="field" style="margin-top:14px"><label>' + esc(t('note')) + '</label>' +
+              '<input id="pNote" class="input" placeholder="' + esc(t('note_ph')) + '"></div>' +
+            '<button class="btn" style="width:100%;margin-top:16px" data-action="pSave">' +
+              esc(t('add_personal')) + '</button></div>' +
+
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('recent_activity')) + '</h2>' +
+            '<div class="sub">' + esc(t('private_note')) + '</div></div></div>' +
+            '<div class="txlist">' + list.slice(0, 16).map(pRow).join('') + '</div></div>' +
+        '</div>';
+    },
+    after: function (page) { const a = page.querySelector('#pAmount'); if (a) a.focus(); }
+  };
+
+  /* View 2b — month by month */
+  SCREENS.mymonth = {
+    html: function () {
+      const list = mine_();
+      const months = [3,4,5,6,7,8,9];
+      const rows = months.map(function (m) {
+        const inM = list.filter(x => x.date.getMonth() + 1 === m);
+        const t2 = pTotals(inM);
+        return { m, inc: t2.inc, out: t2.out, kept: t2.kept,
+                 sent: inM.filter(x => x.cat === 'p_remit') };
+      });
+      const peak = Math.max.apply(null, rows.map(r => Math.max(r.inc, r.out))) || 1;
+      const slices = pSlices(list);
+
+      return '<div class="banner">' + icon('info') + '<span>' + esc(t('mymonth_sub')) + ' \u00b7 ' +
+          esc(t('private_note')) + '</span></div>' +
+        '<div class="grid split">' +
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('per_month')) + '</h2></div></div>' +
+            '<div class="tablewrap"><table><thead><tr><th>' + esc(t('month')) + '</th>' +
+              '<th class="num">' + esc(t('my_income')) + '</th><th class="num">' + esc(t('my_outgoings')) + '</th>' +
+              '<th class="num">' + esc(t('sent_home')) + '</th><th class="num">' + esc(t('my_kept')) + '</th>' +
+              '</tr></thead><tbody>' +
+              rows.map(r => '<tr><td>' + esc(I.monthLabel(r.m, true)) + '</td>' +
+                '<td class="num">' + pmoney(r.inc) + '</td>' +
+                '<td class="num">' + pmoney(r.out) + '</td>' +
+                '<td class="num">' + (r.sent.length
+                    ? r.sent.map(x => pmoney(x.amount, x.currency)).join(' + ') : '\u2014') + '</td>' +
+                '<td class="num"><b>' + pmoney(r.kept) + '</b></td></tr>').join('') +
+            '</tbody></table></div>' +
+            '<div class="bars" style="margin-top:16px">' + rows.map(r =>
+              '<div class="barrow"><span class="who">' + esc(I.monthLabel(r.m)) + '</span>' +
+                '<span class="track"><i style="width:' + (r.out / peak * 100).toFixed(1) +
+                  '%;background:var(--expense)"></i></span>' +
+                '<b>' + pmoney(r.out) + '</b></div>').join('') + '</div></div>' +
+
+          '<div class="card"><div class="cardhead"><div><h2>' + esc(t('habits')) + '</h2>' +
+            '<div class="sub">' + esc(pcur()) + '</div></div></div>' +
+            '<div id="pDonut"></div>' + legendHtml(slices) + '</div>' +
+        '</div>';
+    },
+    after: function () {
+      Ch.donut(document.getElementById('pDonut'), {
+        slices: pSlices(mine_()), fmt: v => pmoney(v), centerLabel: t('total')
+      });
+    }
+  };
+
   /* Reports */
   SCREENS.reports = {
     html: function () {
@@ -1311,6 +1463,27 @@
     type: function (el) { state.addType = el.dataset.v; state.addCat = null; state.addCurrency = 'EGP'; renderShell(); },
     cat: function (el) { state.addCat = el.dataset.c; renderShell(); },
     dayMode: function (el) { state.dayOff = el.dataset.v === 'off'; renderShell(); },
+    pCat: function (el) { state.pCat = el.dataset.c; renderShell(); },
+    pSave: function () {
+      const err = document.getElementById('pErr');
+      const amtEl = document.getElementById('pAmount');
+      const v = parseFloat(amtEl.value);
+      const fail = msg => { err.hidden = false; err.textContent = msg; amtEl.classList.add('err'); };
+      err.hidden = true; amtEl.classList.remove('err');
+      if (!(v > 0)) return fail(t('err_amount'));
+      if (!state.pCat) return fail(t('err_cat'));
+      const date = parseDate(document.getElementById('pDate').value);
+      if (!date || isNaN(date)) return fail(t('err_date'));
+      if (date > D.TODAY) return fail(t('err_future'));
+      const note = document.getElementById('pNote').value.trim();
+      D.addPersonal({
+        type: 'expense', cat: state.pCat, amount: Math.round(v),
+        currency: document.getElementById('pCur').value,
+        date, note: note || 'n_other_note'
+      });
+      state.pCat = null;
+      renderShell(); toast(t('personal_saved'));
+    },
     table: function (el) { state.tables[el.dataset.id] = !state.tables[el.dataset.id]; renderShell(); },
     fType: function (el) { state.filters.type = el.dataset.v; renderShell(); },
     fCat: function (el) { state.filters.cat = el.dataset.v; renderShell(); },
