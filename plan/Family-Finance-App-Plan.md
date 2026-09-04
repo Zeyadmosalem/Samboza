@@ -16,11 +16,11 @@ A private ledger for one family. The mother earns abroad and sends money home; A
 
 | Person | Role in family | App role | Permissions |
 |---|---|---|---|
-| **Mother** | Breadwinner — works abroad, main income source | **Viewer / Auditor** | Read-only. Full visibility of all income, expenses, allowances, loans, car ledger and reports. Cannot add or edit. |
+| **Ghada** (mother) | Breadwinner — works abroad, main income source | **Viewer / Auditor** | Read-only. Full visibility of all income, expenses, allowances, loans, car ledger and reports. Cannot add or edit. |
 | **Abdo** (big brother) | Accountant | **Admin** | Full access. Records and edits every transaction, manages categories, disburses allowances, registers loans, runs the car settlement, sets FX rates, approves member submissions. |
 | **Zeyad** (son) | Allowance recipient | **Member** | Submits his own expenses against his allowance; sees his own balance, history and spending-habit charts. No access to other members' detail. |
 | **Rewan** (daughter) | Allowance recipient | **Member** | Same as Zeyad. |
-| **Uncle Joe** | Maternal uncle — drives the family car for Uber | **Driver** | Submits each day he drives: the takings and what they cost. Sees his own days and his own earnings, and nothing of the family ledger. Cannot see or touch anyone else's money. |
+| **Joe** | Maternal uncle — drives the family car for Uber | **Driver** | Submits each day he drives: the takings and what they cost. Sees his own days and his own earnings, and nothing of the family ledger. Cannot see or touch anyone else's money. |
 | *(future)* | — | any role | The role model must stay open: new members can be added without schema change. |
 
 ### 2.2 Non-user actors (appear in records, do not log in — for now)
@@ -117,12 +117,16 @@ The family owns a car; **Uncle Joe** drives it for Uber. He is a user of the app
 
 **Settled daily** (decision D1). Joe records one submission per day he drives, and **picks the date himself**: there are days off, so the app never assumes the submission is for today. A day he did not drive is simply a day with no record.
 
-**Every expense is classified when he enters it** (decision D2):
+**Joe classifies every expense himself** (decision D2). Picking a label *suggests* a class, but the class is his to set and he can override the suggestion:
 
 | Class | What it covers |
 |---|---|
 | **Direct** | Fuel, tolls — what it cost to earn that day's fares |
 | **Indirect** | Administration, the **kārta** permit, a traffic fine |
+
+The labels are Fuel, Tolls, Permit (kārta), Administration, Traffic fine, and **Other**. Every line also takes an **optional free-text note** — which is what makes *Other* usable rather than a black hole: an unclassifiable cost gets recorded with a description instead of being forced into a category that misrepresents it, or left out of the ledger entirely.
+
+Deriving the class from the label alone was rejected: the same cost is not always the same kind of cost, and a fixed mapping would quietly make that decision for him on every row.
 
 **Both classes come off the takings before Joe's third.** The classification is what the family reports on; it does not change anyone's split.
 
@@ -262,10 +266,12 @@ car_days          id, family_id, drive_date (unique per family), gross_egp,
                   -- D1: one row per day driven. drive_date is chosen by the
                   -- driver, never defaulted to today: there are days off
 
-car_expenses      id, car_day_id, label (fuel|tolls|permit|admin|ticket),
+car_expenses      id, car_day_id, label (fuel|tolls|permit|admin|ticket|other),
                   class (direct|indirect), amount_egp, description
-                  -- D2: class is chosen at entry and deducted before the
-                  -- driver's third; it is a reporting label, not a split
+                  -- D2: the driver sets class himself; the label only
+                  -- suggests a default. Deducted before the driver's third
+                  -- either way — class is a reporting label, not a split.
+                  -- description is optional, and is how 'other' stays useful
 
 budgets           id, family_id, category_id, month, limit_amount      -- Phase 2
 recurring_rules   id, family_id, template fields, schedule             -- Phase 2

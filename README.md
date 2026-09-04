@@ -36,8 +36,8 @@ which is what you want between sessions.
 
 | | |
 |---|---|
-| **Sign in as different people** | The sign-in screen doubles as a role switcher. Abdo (admin) sees everything; Mother (viewer) gets a read-only banner and no write controls anywhere; Zeyad and Rewan (members) see only their own screens and their own numbers; **Uncle Joe (driver)** sees only the car. |
-| **Record a Day, as Joe** | Sign in as Uncle Joe. He picks the date he drove, enters the takings, and adds each cost as **direct** (fuel, tolls) or **indirect** (administration, the kārta permit, a fine). The split recomputes as he types. This is the screen that makes the case for the app. |
+| **Sign in as different people** | The sign-in screen doubles as a role switcher. Abdo (admin) sees everything; Ghada (viewer) gets a read-only banner and no write controls anywhere; Zeyad and Rewan (members) see only their own screens and their own numbers; **Joe (driver)** sees only the car. |
+| **Record a Day, as Joe** | Joe picks the date he drove, enters the takings, and adds each cost — choosing **direct** or **indirect** himself on every line, with an optional note. Picking a label suggests a class; he can override it. There is an **Other** label for costs that fit nothing else. The split recomputes as he types. This is the screen that makes the case for the app. |
 | **Approvals, as Abdo** | Zeyad's and Rewan's submissions queue up with a badge on the nav. Nothing moves their balance until Abdo approves it. |
 | **EN / ع** | Flips the whole app to Arabic with a full RTL layout. Time-axis charts stay left-to-right, which is the normal convention. |
 | **Light / dark** | Defaults to the machine's setting, remembers an explicit choice. |
@@ -117,9 +117,12 @@ Worth stating plainly, because it holds the most money and it **changed** during
 planning.
 
 Joe drives and **submits each day himself**, choosing the date — there are days
-off, so the app never assumes today. Every cost he records is classified as he
-enters it: **direct** (fuel, tolls — what it cost to earn that day's fares) or
-**indirect** (administration, the kārta permit, a traffic fine).
+off, so the app never assumes today. He also **chooses the class of every
+expense**: **direct** (fuel, tolls — what it cost to earn that day's fares) or
+**indirect** (administration, the kārta permit, a traffic fine). Picking a label
+suggests a class; he can override it. An **Other** label plus an optional note on
+every line means an unclassifiable cost gets recorded with a description rather
+than forced into the wrong category or left out.
 
 ```
 net           = gross − direct − indirect

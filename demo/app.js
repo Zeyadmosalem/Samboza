@@ -146,8 +146,7 @@
         '<div class="who">' + users.map(u =>
           '<button data-action="signin" data-id="' + u.id + '">' +
             '<span class="avatar lg" style="background:' + hue(u) + '">' + esc(u.initials) + '</span>' +
-            '<span><span class="n">' + esc(pname(u.id)) +
-              (t('r_' + u.rel) === pname(u.id) ? '' : ' · ' + esc(t('r_' + u.rel))) + '</span><br>' +
+            '<span><span class="n">' + esc(pname(u.id)) + '</span><br>' +
             '<span class="w">' + esc(t('role_' + u.role)) + ' — ' + esc(t('role_' + u.role + '_note')) + '</span></span>' +
           '</button>').join('') +
         '</div>' +
@@ -612,8 +611,8 @@
          kārta permit, a fine) when he records it; the label is what the
          family reports on, not a different split.
   ------------------------------------------------------------------ */
-  const kindOf = label => D.EXPENSE_KINDS[label] || 'direct';
-  const EXP_LABELS = Object.keys(D.EXPENSE_KINDS);
+  const kindOf = D.kindOf;              // the class Joe chose, not one inferred
+  const EXP_LABELS = D.EXPENSE_LABELS;
 
   function dayLadder(c) {
     const row = (label, value, cls, sign) =>
@@ -630,9 +629,10 @@
   }
 
   const expenseChips = c => c.expenses.map(e =>
-    '<span class="chip"><i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:6px;background:' +
-      (kindOf(e.label) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '"></i>' +
-      esc(t('e_' + e.label)) + ' ' + money(e.amount) + '</span>').join('');
+    '<span class="chip" title="' + esc(t(kindOf(e))) + (e.note ? ' — ' + esc(t(e.note)) : '') + '">' +
+      '<i style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:6px;background:' +
+      (kindOf(e) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '"></i>' +
+      esc(e.label === 'other' && e.note ? t(e.note) : t('e_' + e.label)) + ' ' + money(e.amount) + '</span>').join('');
 
   /* Car — what Abdo and the mother see */
   SCREENS.car = {
@@ -672,10 +672,10 @@
             '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
             '<div class="stack">' + open[0].expenses.map(e =>
               '<div class="rowline"><div class="dot" style="background:' +
-                  (kindOf(e.label) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '">' +
+                  (kindOf(e) === 'direct' ? 'var(--trend)' : 'var(--neutral)') + '">' +
                   esc(t('e_' + e.label).slice(0, 2)) + '</div>' +
                 '<div class="m"><div class="n">' + esc(t('e_' + e.label)) + '</div>' +
-                  '<div class="w">' + esc(t(kindOf(e.label))) + '</div></div>' +
+                  '<div class="w">' + esc(t(kindOf(e))) + (e.note ? ' · ' + esc(t(e.note)) : '') + '</div></div>' +
                 '<div class="amt minus">−' + money(e.amount) + '</div></div>').join('') + '</div></div>' +
         '</div>' : '') +
 
@@ -700,13 +700,16 @@
   /* ------------------------------------------------------------------
      Joe's own interface: he records the day, the app does the arithmetic.
   ------------------------------------------------------------------ */
-  function blankDay() { return { date:'2026-09-01', gross:'', rows:[{ label:'fuel', amount:'' }] }; }
+  const blankRow = () => ({ label:'fuel', kind:D.DEFAULT_KIND.fuel, amount:'', note:'' });
+  function blankDay() { return { date:'2026-09-01', gross:'', rows:[blankRow()] }; }
 
   function readDayForm() {
     const g = document.getElementById('dGross');
     const rows = Array.prototype.slice.call(document.querySelectorAll('[data-exprow]')).map(r => ({
-      label: r.querySelector('.expLabel').value,
-      amount: r.querySelector('.expAmt').value
+      label:  r.querySelector('.expLabel').value,
+      kind:   r.querySelector('.expKind').value,
+      amount: r.querySelector('.expAmt').value,
+      note:   r.querySelector('.expNote').value
     }));
     const dt = document.getElementById('dDate');
     return { date: dt ? dt.value : state.day.date, gross: g ? g.value : '', rows };
@@ -718,7 +721,8 @@
     const f = readDayForm();
     const gross = Math.max(0, parseFloat(f.gross) || 0);
     const items = f.rows.filter(r => (parseFloat(r.amount) || 0) > 0)
-                        .map(r => ({ label: r.label, amount: Math.round(parseFloat(r.amount)) }));
+                        .map(r => ({ label: r.label, kind: r.kind,
+                                     amount: Math.round(parseFloat(r.amount)) }));
     box.innerHTML = dayLadder(Object.assign({ gross }, D.settleDay(gross, items)));
   }
 
@@ -741,13 +745,19 @@
           '<div class="cardhead" style="margin-top:14px"><div><h2>' + esc(t('car_expenses')) + '</h2>' +
             '<div class="sub">' + esc(t('kind_note')) + '</div></div></div>' +
           '<div class="stack">' + dy.rows.map((r, i) =>
-            '<div class="exprow" data-exprow><select class="input expLabel">' +
-              EXP_LABELS.map(l => '<option value="' + l + '"' + (r.label === l ? ' selected' : '') + '>' +
-                esc(t('e_' + l)) + '</option>').join('') + '</select>' +
-              '<span class="pill ' + (kindOf(r.label) === 'direct' ? 'member' : '') + '">' +
-                esc(t(kindOf(r.label))) + '</span>' +
-              '<input class="input expAmt" inputmode="decimal" placeholder="0" value="' + esc(r.amount) + '">' +
-              '<button class="btn ghost sm" data-action="delExp" data-i="' + i + '">×</button></div>').join('') +
+            '<div class="exprow" data-exprow>' +
+              '<div class="exprow-top">' +
+                '<select class="input expLabel">' +
+                  EXP_LABELS.map(l => '<option value="' + l + '"' + (r.label === l ? ' selected' : '') + '>' +
+                    esc(t('e_' + l)) + '</option>').join('') + '</select>' +
+                '<select class="input expKind">' +
+                  ['direct','indirect'].map(k => '<option value="' + k + '"' + (r.kind === k ? ' selected' : '') + '>' +
+                    esc(t(k)) + '</option>').join('') + '</select>' +
+                '<input class="input expAmt" inputmode="decimal" placeholder="0" value="' + esc(r.amount) + '">' +
+                '<button class="btn ghost sm" data-action="delExp" data-i="' + i + '">×</button>' +
+              '</div>' +
+              '<input class="input expNote" placeholder="' + esc(t('exp_note_ph')) + '" value="' + esc(r.note || '') + '">' +
+            '</div>').join('') +
           '</div>' +
           '<button class="btn ghost sm" style="margin-top:10px" data-action="addExp">+ ' + esc(t('add_expense_row')) + '</button>' +
 
@@ -768,6 +778,9 @@
       page.addEventListener('input', previewDay);
       page.addEventListener('change', function (e) {
         if (e.target.classList.contains('expLabel')) {
+          // the label suggests a class; Joe can still change it afterwards
+          const row = e.target.closest('[data-exprow]');
+          row.querySelector('.expKind').value = D.DEFAULT_KIND[e.target.value] || 'direct';
           state.day = readDayForm();
           renderShell();
         } else previewDay();
@@ -1185,13 +1198,13 @@
     /* Joe's day submission */
     addExp: function () {
       state.day = readDayForm();
-      state.day.rows.push({ label:'fuel', amount:'' });
+      state.day.rows.push(blankRow());
       renderShell();
     },
     delExp: function (el) {
       state.day = readDayForm();
       state.day.rows.splice(+el.dataset.i, 1);
-      if (!state.day.rows.length) state.day.rows.push({ label:'fuel', amount:'' });
+      if (!state.day.rows.length) state.day.rows.push(blankRow());
       renderShell();
     },
     saveDay: function () {
@@ -1205,7 +1218,9 @@
         return;
       }
       const items = f.rows.filter(r => (parseFloat(r.amount) || 0) > 0)
-        .map(r => ({ id: D.uid('ce'), label: r.label, amount: Math.round(parseFloat(r.amount)) }));
+        .map(r => ({ id: D.uid('ce'), label: r.label, kind: r.kind,
+                     amount: Math.round(parseFloat(r.amount)),
+                     note: (r.note || '').trim() || null }));
       const date = parseDate(f.date);
       D.carDays.push(Object.assign({
         id: D.uid('cd'), date, gross, expenses: items,

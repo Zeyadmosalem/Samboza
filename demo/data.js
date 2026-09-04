@@ -9,7 +9,7 @@ window.DEMO = (function () {
   /* ---- people (§2). isUser decides who can sign in.
      `dark` is the same hue re-stepped for the dark surface, not a tint. --- */
   const people = [
-    { id:'mother',  rel:'mother',          role:'viewer', isUser:true,  initials:'M',  color:'#4a3aa7', dark:'#6a5bd0' },
+    { id:'mother',  rel:'mother',          role:'viewer', isUser:true,  initials:'Gh',  color:'#4a3aa7', dark:'#6a5bd0' },
     { id:'abdo',    rel:'brother',         role:'admin',  isUser:true,  initials:'A',  color:'#0f9d75', dark:'#14a87e' },
     { id:'zeyad',   rel:'son',             role:'member', isUser:true,  initials:'Z',  color:'#2a78d6', dark:'#3987e5' },
     { id:'rewan',   rel:'daughter',        role:'member', isUser:true,  initials:'R',  color:'#e87ba4', dark:'#d55181' },
@@ -180,21 +180,29 @@ window.DEMO = (function () {
      Joe drives and submits each working day himself, picking the date —
      there are days off, so the date cannot be assumed to be today.
 
-     Every expense he records is classified when he enters it:
+     Every expense carries a class:
        direct   — fuel, tolls: the cost of earning that day's fares
        indirect — administration, the كارتة permit, a traffic fine
      Both come off the gross before Joe's third. The classification is what
-     the family reports on, not a different split. ------------------------- */
-  const EXPENSE_KINDS = {
+     the family reports on, not a different split.
+
+     The label only SUGGESTS a class. Joe sets `kind` himself on every row
+     and can override the suggestion — a toll can be indirect if that is
+     how he sees it, and "Other" has no sensible default at all, so it
+     carries a free-text note instead. ------------------------------------ */
+  const DEFAULT_KIND = {
     fuel:   'direct',
     tolls:  'direct',
     permit: 'indirect',
     admin:  'indirect',
-    ticket: 'indirect'
+    ticket: 'indirect',
+    other:  'indirect'
   };
+  const EXPENSE_LABELS = Object.keys(DEFAULT_KIND);
+  const kindOf = e => e.kind || DEFAULT_KIND[e.label] || 'direct';
 
   function settleDay(gross, items) {
-    const of = k => items.filter(e => EXPENSE_KINDS[e.label] === k)
+    const of = k => items.filter(e => kindOf(e) === k)
                          .reduce((s, e) => s + e.amount, 0);
     const direct = of('direct'), indirect = of('indirect');
     const net    = Math.max(0, gross - direct - indirect);
@@ -210,11 +218,15 @@ window.DEMO = (function () {
     for (let day = 1; day <= lastDay; day++) {
       if (m !== 9 && rand() < 0.17) continue;                 // a day off
       const gross = 520 + Math.round(rand() * 460);
-      const items = [{ id:uid('ce'), label:'fuel', amount: 90 + Math.round(rand() * 110) }];
-      if (rand() < 0.12) items.push({ id:uid('ce'), label:'tolls',  amount: 20 + Math.round(rand() * 40) });
-      if (day === 3)     items.push({ id:uid('ce'), label:'permit', amount: 200 });
-      if (rand() < 0.05) items.push({ id:uid('ce'), label:'ticket', amount: 150 + Math.round(rand() * 150) });
-      if (rand() < 0.07) items.push({ id:uid('ce'), label:'admin',  amount: 80 + Math.round(rand() * 90) });
+      const exp = (label, amount, note) => ({
+        id: uid('ce'), label, amount, kind: DEFAULT_KIND[label], note: note || null
+      });
+      const items = [exp('fuel', 90 + Math.round(rand() * 110))];
+      if (rand() < 0.12) items.push(exp('tolls',  20 + Math.round(rand() * 40)));
+      if (day === 3)     items.push(exp('permit', 200));
+      if (rand() < 0.05) items.push(exp('ticket', 150 + Math.round(rand() * 150)));
+      if (rand() < 0.07) items.push(exp('admin',  80 + Math.round(rand() * 90)));
+      if (rand() < 0.04) items.push(exp('other',  40 + Math.round(rand() * 90), 'n_carwash'));
       const open = (m === 9);                                 // today is still open
       carDays.push(Object.assign({
         id: uid('cd'), date: d(m, day), gross, expenses: items,
@@ -275,6 +287,6 @@ window.DEMO = (function () {
   });
 
   return { TODAY, RATES, FAMILY, people, categories, tx, remittances, carDays,
-           EXPENSE_KINDS, settleDay, loans, allowances, allowanceRates, rateOn,
+           DEFAULT_KIND, EXPENSE_LABELS, kindOf, settleDay, loans, allowances, allowanceRates, rateOn,
            memberTx, add, uid };
 })();

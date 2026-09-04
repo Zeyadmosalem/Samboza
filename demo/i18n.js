@@ -28,8 +28,8 @@ window.I18N = (function () {
     readonly_banner:'Read-only view — you can see everything, but nothing can be changed from this account.',
 
     /* people */
-    p_mother:'Mother', p_abdo:'Abdo', p_zeyad:'Zeyad', p_rewan:'Rewan',
-    p_mona:'Mona', p_grandma:'Grandma', p_marwa:'Marwa', p_uncle:'Uncle Joe',
+    p_mother:'Ghada', p_abdo:'Abdo', p_zeyad:'Zeyad', p_rewan:'Rewan',
+    p_mona:'Mona', p_grandma:'Grandma', p_marwa:'Marwa', p_uncle:'Joe',
     p_adamanas:'Adam & Anas',
     r_mother:'Mother', r_brother:'Big brother', r_son:'Son', r_daughter:'Daughter',
     r_aunt:'Aunt', r_grandmother:'Grandmother', r_uncle_maternal:'Uncle (mother’s side)', r_cousins:'Cousins',
@@ -124,8 +124,9 @@ window.I18N = (function () {
 
     /* car expense classification */
     direct:'Direct', indirect:'Indirect', expense_kind:'Type', add_expense_row:'Add expense',
-    kind_note:'Direct is what it cost to earn the fares — fuel, tolls. Indirect is administration, the kārta permit, a traffic fine. Both come off the takings before your third; the label is what the family reports on.',
+    kind_note:'You choose direct or indirect on every line. Direct is what it cost to earn the fares — fuel, tolls. Indirect is administration, the kārta permit, a fine. Picking a label suggests a class, but you can change it. Both come off the takings before your third; the label is what the family reports on.',
     e_fuel:'Fuel', e_tolls:'Tolls', e_permit:'Permit (kārta)', e_admin:'Administration', e_ticket:'Traffic fine',
+    e_other:'Other', exp_note_ph:'Note — what was it? (optional)', n_carwash:'Car wash',
     net_after:'Net after expenses', joe_share:'Joe’s share (⅓)', remaining_after:'Remaining after Joe’s share',
     total_direct:'Direct expenses', total_indirect:'Indirect expenses',
 
@@ -208,8 +209,8 @@ window.I18N = (function () {
     role_viewer_note:'اطلاع فقط. يرى كل شيء ولا يغيّر شيئًا',
     readonly_banner:'عرض للاطلاع فقط — ترى كل شيء، لكن لا يمكن تعديل أي شيء من هذا الحساب.',
 
-    p_mother:'الوالدة', p_abdo:'عبده', p_zeyad:'زياد', p_rewan:'روان',
-    p_mona:'منى', p_grandma:'الجدة', p_marwa:'مروة', p_uncle:'الخال جو',
+    p_mother:'غادة', p_abdo:'عبدو', p_zeyad:'زياد', p_rewan:'ريوان',
+    p_mona:'منى', p_grandma:'الجدة', p_marwa:'مروة', p_uncle:'يوسف',
     p_adamanas:'آدم وأنس',
     r_mother:'الوالدة', r_brother:'الأخ الأكبر', r_son:'الابن', r_daughter:'الابنة',
     r_aunt:'الخالة', r_grandmother:'الجدة', r_uncle_maternal:'الخال', r_cousins:'أولاد الخالة',
@@ -246,12 +247,12 @@ window.I18N = (function () {
     log_expense:'تسجيل مصروف', my_history:'سجلي', habits:'فلوسي بتروح فين',
     of_allowance:'من مصروف الشهر',
 
-    car_title:'سيارة أوبر', car_sub:'الخال جو بيسوق وبيسجل كل يوم بنفسه. أي مصروف بيسجله بيتخصم من إيراد اليوم الأول؛ بعدين بياخد ثلث الباقي، واللي يفضل بينقسم ٧٥٪ للعائلة و٢٥٪ لمروة.',
-    gross:'إجمالي الإيراد', uncle_share:'نصيب الخال جو (⅓)', operating_pool:'الباقي (⅔)',
+    car_title:'سيارة أوبر', car_sub:'يوسف بيسوق وبيسجل كل يوم بنفسه. أي مصروف بيسجله بيتخصم من إيراد اليوم الأول؛ بعدين بياخد ثلث الباقي، واللي يفضل بينقسم ٧٥٪ للعائلة و٢٥٪ لمروة.',
+    gross:'إجمالي الإيراد', uncle_share:'نصيب يوسف (⅓)', operating_pool:'الباقي (⅔)',
     car_expenses:'مصاريف السيارة', profit:'صافي الربح', family_share:'نصيب العائلة (٧٥٪)', marwa_share:'نصيب مروة (٢٥٪)',
     settle:'تسوية الفترة', settled:'تمت التسوية', open_period:'مفتوحة', add_car_expense:'إضافة مصروف سيارة',
     fuel:'بنزين', maintenance:'صيانة', licensing:'ترخيص', car_history:'التسويات السابقة',
-    period:'الفترة', status:'الحالة', car_calc:'التسوية يومية. الخال جو بيسجل الإيراد والمصاريف، والتطبيق بيعمل الحسبة.',
+    period:'الفترة', status:'الحالة', car_calc:'التسوية يومية. يوسف بيسجل الإيراد والمصاريف، والتطبيق بيعمل الحسبة.',
 
     loan_title:'السلف', loan_sub:'مفصولة عن الوارد العادي عشان العائلة تشوف المستحق عليها.',
     lender:'المُقرِض', borrowed:'مستلفة', lent:'مُقرَضة', outstanding:'قائمة',
@@ -293,9 +294,10 @@ window.I18N = (function () {
 
     /* car expense classification */
     direct:'مباشرة', indirect:'غير مباشرة', expense_kind:'النوع', add_expense_row:'إضافة مصروف',
-    kind_note:'المباشرة هي اللي دفعتها عشان تكسب اليوم — بنزين ورسوم طرق. غير المباشرة مصاريف إدارية أو الكارتة أو مخالفة. الاتنين بيتخصموا من الإيراد قبل نصيبك؛ التصنيف بس عشان العائلة تعرف الفلوس راحت فين.',
+    kind_note:'انت اللي بتختار مباشرة ولا غير مباشرة في كل سطر. المباشرة هي اللي دفعتها عشان تكسب اليوم — بنزين ورسوم طرق. غير المباشرة مصاريف إدارية أو الكارتة أو مخالفة. لما تختار نوع المصروف بنقترح عليك تصنيف، وتقدر تغيره. الاتنين بيتخصموا من الإيراد قبل نصيبك.',
     e_fuel:'بنزين', e_tolls:'رسوم طرق', e_permit:'كارتة', e_admin:'مصاريف إدارية', e_ticket:'مخالفة',
-    net_after:'الصافي بعد المصاريف', joe_share:'نصيب الخال جو (⅓)', remaining_after:'الباقي بعد نصيب الخال',
+    e_other:'أخرى', exp_note_ph:'ملاحظة — كانت إيه؟ (اختياري)', n_carwash:'غسيل العربية',
+    net_after:'الصافي بعد المصاريف', joe_share:'نصيب يوسف (⅓)', remaining_after:'الباقي بعد نصيب يوسف',
     total_direct:'مصاريف مباشرة', total_indirect:'مصاريف غير مباشرة',
 
     /* approvals */
@@ -325,7 +327,7 @@ window.I18N = (function () {
     q7:'الهدايا',
     q8:'الكاش والبنك',
     q9:'التقويم واللغة',
-    a1:'يومية. الخال جو بيختار التاريخ بنفسه — في أيام راحة.',
+    a1:'يومية. يوسف بيختار التاريخ بنفسه — في أيام راحة.',
     a2:'بعد المصاريف. وبيصنّف كل مصروف مباشر ولا غير مباشر وهو بيسجله.',
     a3:'مبلغ شهري ثابت لكل شخص، ويقدر يزيد أو يقل مع الوقت.',
     a4:'عبده بيكتبه بنفسه، ويتحفظ مع السجل.',
