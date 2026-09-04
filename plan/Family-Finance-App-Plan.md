@@ -145,7 +145,9 @@ marwa_share      = remaining × 0.25     → paid to Marwa
 
 Properties per day: date, gross, itemised expenses each with its class, computed net, Joe's share, family share, Marwa's share, status (submitted / settled), submitted_by (Joe), settled_by (Abdo). Joe enters only the takings and the costs; the app does the arithmetic.
 
-**Still open:** what happens on a day where expenses exceed the takings — a large fine on a quiet day. The demo floors the net at zero, so nobody is paid rather than anybody owing money. Carrying the deficit into the next day is the alternative and needs a decision before build.
+**A day can be negative** (decision D10). A large fine on a quiet day costs more than it earned, and the loss is shared in exactly the ratios a profit is: Joe a third, the family three quarters of the rest, Marwa a quarter. It is not floored at zero — the ledger runs over time, so a bad Tuesday nets off against a good Wednesday.
+
+**Joe hands over when it suits him** (D11) — daily, every ten days, no fixed rhythm. He *records* days; Abdo *confirms* a handover when the cash is in his hand. Until then the family share is money Joe holds, not money the family has. A handover that comes up short is **carried** (D12): the balance still owed simply stays owed.
 
 ### 3.5 Loans
 
@@ -334,8 +336,14 @@ Settled with the family on 4 September 2026. These were the nine open questions;
 | **D8** | Cash vs bank/wallet | **One pot.** No account separation. |
 | **D9** | Calendar and language | **Gregorian dates only.** **English and Arabic from day one**, switchable in the UI as the demo does it — Arabic moves out of Phase 2 into Phase 1. |
 
-### Still open
+### Later decisions
 
-One question came out of D1 and D2 rather than being answered by them:
+Three more were settled once the demo made them concrete:
 
-- **A day where expenses exceed the takings** — a large fine on a quiet day. The demo floors the net at zero, so nobody is paid rather than anybody owing money. Carrying the deficit into the next day is the alternative. Needs a decision before build.
+| # | Question | Decision |
+|---|---|---|
+| **D10** | A day where costs exceed takings | **It goes negative**, and the loss is shared in the same ratios as a profit — Joe a third, the family three quarters of the rest, Marwa a quarter. Not floored: the ledger runs over time, so a bad day nets off against a good one. |
+| **D11** | When does Joe hand cash over? | **Whenever suits him** — daily, every ten days, no fixed rhythm. He *records* days; Abdo *confirms* a handover when the money is in his hand. Until then it is money Joe holds, not money the family has. |
+| **D12** | A handover that comes up short | **Carried, not written off.** If 1,725 is due and 1,700 arrives, Joe still owes 25 and it is added to his next handover. The balance of `due_from_driver` is the carried amount. |
+
+Nothing is open.

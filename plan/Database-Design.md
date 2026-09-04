@@ -345,8 +345,31 @@ create table car_handovers (
 ```
 
 `counted_egp` is the honest field: if the computed amount is 1,725 and Joe hands
-over 1,700, the 25 difference is visible instead of silently vanishing. Post the
-difference to a `handover_variance` expense account.
+over 1,700, the 25 difference is visible instead of silently vanishing.
+
+**The difference is CARRIED, not written off** (decision D10). Joe still owes it,
+and it is added to what is due at his next handover.
+
+In the double-entry model this needs no extra machinery, which is a good sign
+the model is right. Recording days debits `due_from_driver`; a handover credits
+it by whatever was *actually counted*:
+
+```
+recording 8 days   debit  due_from_driver   1,725
+                   credit car_income        1,725
+
+handover of 1,700  debit  cash              1,700
+                   credit due_from_driver   1,700
+
+              →  due_from_driver still holds 25
+```
+
+The balance of `due_from_driver` **is** the carried amount. Nothing is written
+off, no variance account is needed, and "what Joe still owes" is a query against
+one account rather than a number somebody maintains by hand.
+
+`amount_egp` stays as the computed figure so the arithmetic remains auditable;
+`counted_egp` is what moved. Post the journal against `counted_egp`.
 
 Income posts on `received_on`, **not** on the drive date — that is when the
 family actually got the money.

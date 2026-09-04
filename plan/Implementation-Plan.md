@@ -266,7 +266,7 @@ Steps 1 and 2 have a closing window. Everything else can be reordered.
 
 ---
 
-## Still open
+## Decisions made once the demo made them concrete
 
 Both earlier questions are settled and built:
 
@@ -278,9 +278,11 @@ Both earlier questions are settled and built:
   app records and tracks rather than assuming a rhythm, and Abdo confirms
   receipt.
 
-Still open:
+- **A handover shortfall is carried, not written off.** If the computed share is
+  1,725 and Joe hands over 1,700, he still owes the 25 and it is added to his
+  next handover. In the double-entry model this is free: the balance of
+  `due_from_driver` *is* the carried amount.
+- **Grandma stays "Grandma".** It is what the family calls her, so it is her
+  display name. `relationship` still records `grandmother` for Arabic.
 
-- **Handover variance.** If the computed share is 1,725 and Joe hands over
-  1,700, `counted_egp` captures the difference — but nobody has decided whether
-  it is written off or carried against his next handover.
-- **Grandma has no name** in the demo; she is still labelled by her role.
+Nothing is open. Everything needed to start Phase 0 is decided.
