@@ -1,0 +1,28 @@
+# Migrations apply cleanly and every RLS assertion holds.
+# A permissions regression must break the build — that is the entire point.
+name: database
+
+on:
+  push:
+    paths: ['supabase/**', '.github/workflows/db.yml']
+  pull_request:
+    paths: ['supabase/**']
+
+jobs:
+  migrate-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start a local Supabase stack
+        run: supabase start
+
+      - name: Apply migrations from scratch
+        run: supabase db reset
+
+      - name: Row-level security suite
+        run: supabase test db

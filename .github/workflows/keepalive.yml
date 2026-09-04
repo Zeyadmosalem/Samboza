@@ -1,0 +1,21 @@
+# Supabase pauses a free project after ~7 days of no activity. A family app
+# goes quiet over a holiday and the database sleeps; waking it is a click,
+# but the app is down until somebody notices. One cheap query prevents it.
+name: keepalive
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'      # every Monday, 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the database
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/families?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "PostgREST returned $code"
+          test "$code" = "200"

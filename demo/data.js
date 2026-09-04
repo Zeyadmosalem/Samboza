@@ -241,14 +241,22 @@ window.DEMO = (function () {
      a third of it, the family three quarters of the rest, Marwa a quarter.
      Nobody is shielded. It is not floored at zero, because the ledger runs
      over time — a bad Tuesday simply nets off against a good Wednesday. */
+  /* Half-away-from-zero, matching Postgres round() on numeric. JS
+     Math.round is half-UP, so the two disagree on exact negative halves:
+     Math.round(-1.5) is -1, round(-1.5) in Postgres is -2. Now that a day
+     can be negative that difference is reachable — across a +/-5000 range
+     it changes the split on 833 nets — so the client rounds the database
+     way rather than the other way round. */
+  const rnd = x => Math.sign(x) * Math.round(Math.abs(x));
+
   function settleDay(gross, items) {
     const of = k => items.filter(e => kindOf(e) === k)
                          .reduce((s, e) => s + e.amount, 0);
     const direct = of('direct'), indirect = of('indirect');
     const net    = gross - direct - indirect;     // may be below zero
-    const uncle  = Math.round(net / 3);
+    const uncle  = rnd(net / 3);
     const rest   = net - uncle;
-    const family = Math.round(rest * 0.75);
+    const family = rnd(rest * 0.75);
     return { direct, indirect, net, uncle, rest, family, marwa: rest - family };
   }
 
