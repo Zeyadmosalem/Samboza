@@ -163,19 +163,25 @@ check('Add Transaction: a member submits, and it lands pending',
     !ledger.error && ledger.data.length === 0,
     ledger.error ? `errored: ${ledger.error.message}` : '0 rows and no error')
 
-  // D10: a losing day is a loss, shared in the same ratios as a profit.
-  const loss = await admin.from('car_days').insert({
-    family_id: fam.id, drive_date: addDays(TODAY, -1), submitted_by: P.Joe.id,
-    gross_egp: 5000, direct_egp: 25000, indirect_egp: 0, net_egp: -20000,
-    driver_egp: -7000, family_egp: -9750, marwa_egp: -3250,
-  }).select().single()
-  check('Dashboard (driver): a losing day stays negative, and still splits exactly',
-    !loss.error && loss.data.net_egp === -20000 &&
-      loss.data.driver_egp + loss.data.family_egp + loss.data.marwa_egp === -20000,
-    loss.error?.message ?? `net ${loss.data?.net_egp}`)
+  // D13, which replaced D10: a losing day is recorded IN FULL and shared by
+  // nobody. Recorded through the RPC, because a direct insert with a negative
+  // share is now refused by cd_shares_not_negative — which is the point.
+  const loss = await joe.rpc('record_car_day', {
+    p_family: fam.id, p_drive_date: addDays(TODAY, -1), p_worked: true,
+    p_gross: 5000,
+    p_expenses: [{ label: 'ticket', class: 'indirect', amount_egp: 25000 }],
+    p_client_uuid: randomUUID(),
+  })
+  const { data: lossRow } = await admin.from('car_days').select('*')
+    .eq('id', loss.data ?? '').maybeSingle()
+  check('Dashboard (driver): a losing day is recorded in full and shared by nobody',
+    !loss.error && lossRow?.net_egp === -20000 &&
+      lossRow.driver_egp + lossRow.family_egp + lossRow.marwa_egp === 0,
+    loss.error?.message ?? `net ${lossRow?.net_egp}, shares ${lossRow?.driver_egp}/${lossRow?.family_egp}/${lossRow?.marwa_egp}`)
 
+  await admin.from('car_expenses').delete().eq('car_day_id', loss.data ?? '')
   await admin.from('car_days').delete().eq('id', day.id)
-  await admin.from('car_days').delete().eq('id', loss.data?.id ?? '')
+  await admin.from('car_days').delete().eq('id', loss.data ?? '')
 }
 
 /* --------------------------------------------------------- the allowance */

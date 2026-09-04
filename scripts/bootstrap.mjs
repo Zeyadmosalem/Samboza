@@ -77,6 +77,10 @@ const ACCOUNTS = [
   { key: 'due_from_driver',   kind: 'asset',  name: 'Due from driver' },
   { key: 'remittance_income', kind: 'income', name: 'Remittances' },
   { key: 'car_income',        kind: 'income', name: 'Car income' },
+  // D14: Marwa's quarter arrives with the family's share and is owed to her
+  // until Abdo pays it out with her allowance. Money we hold, not money we
+  // earned — so a liability, not income.
+  { key: 'car_share_payable', kind: 'liability', name: 'Car share owed' },
   { key: 'loan_liability',    kind: 'liability', name: 'Loans owed' },
 ]
 
@@ -215,6 +219,22 @@ async function main() {
 
   const { data: accounts } = await db.from('accounts').select('*').eq('family_id', family.id)
   void accounts
+
+  /* ---- who takes the car's quarter ------------------------------------
+     Named on the family rather than hardcoded, so the arrangement can change
+     without a migration. */
+  {
+    const { data: fam } = await db.from('families')
+      .select('car_share_person').eq('id', family.id).single()
+    if (!fam?.car_share_person) {
+      const { data: marwa } = await db.from('people').select('id')
+        .eq('family_id', family.id).eq('display_name', 'Marwa').maybeSingle()
+      if (marwa) {
+        await db.from('families').update({ car_share_person: marwa.id }).eq('id', family.id)
+        log('car share -> Marwa')
+      }
+    }
+  }
 
   /* ---- allowance rates ----------------------------------------------- */
   const { data: people } = await db.from('people').select('*').eq('family_id', family.id)

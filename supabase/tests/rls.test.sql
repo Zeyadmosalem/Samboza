@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(59);
+select plan(70);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -38,13 +38,22 @@ insert into people (id, family_id, member_no, display_name, relationship,
   ('bbbb0000-0000-4000-8000-000000000003','aaaaaaaa-0000-4000-8000-000000000001',3,'Zeyad','son',           true,'33333333-3333-4333-8333-333333333333','member'),
   ('bbbb0000-0000-4000-8000-000000000004','aaaaaaaa-0000-4000-8000-000000000001',4,'Rewan','daughter',      true,'44444444-4444-4444-8444-444444444444','member'),
   ('bbbb0000-0000-4000-8000-000000000005','aaaaaaaa-0000-4000-8000-000000000001',9,'Joe','uncle_maternal',  true,'55555555-5555-4555-8555-555555555555','driver'),
-  ('bbbb0000-0000-4000-8000-000000000006','aaaaaaaa-0000-4000-8000-000000000002',1,'Outsider','external',   true,'66666666-6666-4666-8666-666666666666','admin');
+  ('bbbb0000-0000-4000-8000-000000000006','aaaaaaaa-0000-4000-8000-000000000002',1,'Outsider','external',   true,'66666666-6666-4666-8666-666666666666','admin'),
+  -- Takes the car's quarter. No login: she is paid, she does not record.
+  ('bbbb0000-0000-4000-8000-000000000007','aaaaaaaa-0000-4000-8000-000000000001',7,'Marwa','aunt_maternal', false, null, null);
+
+-- Named on the family rather than hardcoded, so the arrangement can change.
+update families set car_share_person = 'bbbb0000-0000-4000-8000-000000000007'
+ where id = 'aaaaaaaa-0000-4000-8000-000000000001';
 
 insert into accounts (id, family_id, kind, name, system_key) values
   ('cccc0000-0000-4000-8000-000000000001','aaaaaaaa-0000-4000-8000-000000000001','asset','Cash','cash'),
   ('cccc0000-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001','income','Car income','car_income'),
   ('cccc0000-0000-4000-8000-000000000003','aaaaaaaa-0000-4000-8000-000000000001','asset','Due from driver','due_from_driver'),
   ('cccc0000-0000-4000-8000-000000000005','aaaaaaaa-0000-4000-8000-000000000001','expense','Allowance','cat:allowance'),
+  -- D14: Marwa's quarter is money the family HOLDS for her between Joe
+  -- handing it over and Abdo paying it out. A liability, not income.
+  ('cccc0000-0000-4000-8000-000000000006','aaaaaaaa-0000-4000-8000-000000000001','liability','Car share owed','car_share_payable'),
   -- The OTHER family's cash. Nothing in Samboza may ever post to it.
   ('cccc0000-0000-4000-8000-000000000004','aaaaaaaa-0000-4000-8000-000000000002','asset','Their cash','cash');
 
@@ -207,8 +216,9 @@ select is(
   (select status::text from car_days where drive_date = current_date - 2),
   'off', 'and it is stored as a day off, not as an absence');
 
--- D10: a large fine on a quiet day. The loss is shared in the same ratios,
--- and is not floored at zero.
+-- D13, replacing D10: a large fine on a quiet day is recorded IN FULL —
+-- hiding the cost would make the car look cheaper than it is — but it is
+-- shared by nobody. Joe paid it out of pocket and the family makes him whole.
 select lives_ok(
   $$select record_car_day('aaaaaaaa-0000-4000-8000-000000000001',
       current_date - 3, true, 5000,
@@ -216,8 +226,19 @@ select lives_ok(
   'Joe CAN record a losing day');
 
 select is(
-  (select family_egp from car_days where drive_date = current_date - 3),
-  -10000::bigint, 'and the family carries its share of the loss');
+  (select driver_egp + family_egp + marwa_egp from car_days
+    where drive_date = current_date - 3),
+  0::bigint, 'and nobody takes a share of a loss');
+
+select ok(
+  (select journal_id from car_days where drive_date = current_date - 3) is null,
+  'a losing day posts NOTHING until the admin settles it');
+
+-- A second earning day, so voiding one below does not disturb the handover.
+select lives_ok(
+  $$select record_car_day('aaaaaaaa-0000-4000-8000-000000000001',
+      current_date - 4, true, 30000, '[]'::jsonb)$$,
+  'Joe records a second day');
 
 -- =====================================================================
 -- Ghada — viewer and auditor. Sees everything, changes nothing.
@@ -298,23 +319,49 @@ select throws_ok(
 -- 0012, the hole this all existed to fill: before it, NOTHING ever debited
 -- due_from_driver, so the first handover drove it negative and the dashboard
 -- read zero however many days Joe had recorded.
--- 37,500 earned on the good day, less 10,000 lost on the bad one.
+--
+-- D14: what Joe hands over is the family's share AND Marwa's, together.
+-- 37,500 + 12,500 from the first day, 15,000 + 5,000 from the second.
 select is(
   (select balance::bigint from account_balances
     where account_id = 'cccc0000-0000-4000-8000-000000000003'),
-  27500::bigint, 'what Joe holds is a receivable from the day he earns it');
+  70000::bigint, 'what Joe holds is a receivable from the day he earns it');
+
+-- …but only the family's part of it is income. Marwa's is owed to her.
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000006'),
+  -17500::bigint, 'Marwa''s quarter is a liability, not family income');
+
+-- D13: the admin settles the losing day out of family money, in a category
+-- he picks, with a note saying what it was.
+select lives_ok(
+  $$select settle_car_loss(
+      (select id from car_days where drive_date = current_date - 3),
+      'dddd0000-0000-4000-8000-000000000001', 'car maintenance')$$,
+  'the admin settles a losing day as a family expense');
+
+select ok(
+  (select loss_journal_id from car_days where drive_date = current_date - 3) is not null,
+  'and the day is no longer waiting for him');
+
+select throws_ok(
+  $$select settle_car_loss(
+      (select id from car_days where drive_date = current_date - 3),
+      'dddd0000-0000-4000-8000-000000000001', 'again')$$,
+  'P0001', null, 'a losing day cannot be settled twice');
 
 -- A mistyped day is voided, never edited: its journal is reversed, so the
 -- correction is visible in the ledger rather than silent.
 select lives_ok(
-  $$select void_car_day((select id from car_days where drive_date = current_date - 3),
+  $$select void_car_day((select id from car_days where drive_date = current_date - 4),
                         'recorded twice')$$,
   'the admin voids a day');
 
 select is(
   (select balance::bigint from account_balances
     where account_id = 'cccc0000-0000-4000-8000-000000000003'),
-  37500::bigint, 'and voiding it reverses the receivable it created');
+  50000::bigint, 'and voiding it reverses the receivable it created');
 
 -- The handover no longer takes account parameters: it derives cash and
 -- due_from_driver from the family itself. 37,000 counted against 37,500 due
@@ -323,13 +370,42 @@ select lives_ok(
   $$select confirm_handover('aaaaaaaa-0000-4000-8000-000000000001',
       array(select id from car_days
              where drive_date = current_date - 1 and voided_at is null),
-      current_date, 37000)$$,
+      current_date, 49500)$$,
   'the admin confirms a handover without naming the accounts');
 
 select is(
   (select balance::bigint from account_balances
     where account_id = 'cccc0000-0000-4000-8000-000000000003'),
   500::bigint, 'a short handover carries the difference, and does not write it off');
+
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000006'),
+  -12500::bigint, 'and the handover does not touch what is owed to Marwa');
+
+-- D14: she is paid her quarter WITH her allowance, one envelope, one journal.
+select lives_ok(
+  $$select set_allowance_rate('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000007', 200000, '2026-01-01')$$,
+  'the admin sets Marwa''s allowance');
+
+select lives_ok(
+  $$select pay_allowance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000007',
+      date_trunc('month', current_date)::date, current_date)$$,
+  'and pays her for this month');
+
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000006'),
+  0::bigint, 'which clears her car share in the same payment');
+
+-- The allowance record still says the ALLOWANCE. Folding the car share into
+-- that figure would make every report of what she is paid monthly wrong.
+select is(
+  (select amount_egp from allowances
+    where recipient_id = 'bbbb0000-0000-4000-8000-000000000007'),
+  200000::bigint, 'and the allowance row still records the allowance alone');
 
 -- =====================================================================
 -- 0010 — the allowance: effective-dated, paid once, and what is left.

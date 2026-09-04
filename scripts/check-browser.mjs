@@ -274,8 +274,11 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
       .map(l => l.textContent.trim());
     return lines.join(' | ');
   })()`)
-  check('Joe sees the loss shared before he submits',
-    /−EGP 200/.test(preview) && /−EGP 67/.test(preview) && /−EGP 100/.test(preview),
+  // D13: he sees the loss, and he sees that nobody takes a share of it.
+  // Showing him a negative third would say he owes the family for a fine he
+  // already paid out of his own pocket.
+  check('Joe sees the loss, and that nobody shares it, before he submits',
+    /−EGP 200/.test(preview) && !/−EGP 67/.test(preview) && !/−EGP 100/.test(preview),
     preview)
 
   await page.ev(`document.querySelector('form.form').requestSubmit()`)
@@ -284,16 +287,18 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
     done ? '' : await page.ev(`document.querySelector('.errmsg')?.textContent ?? '(no message)'`))
 
   const { data: day } = await admin.from('car_days').select('*').is('voided_at', null).single()
-  check('…stored negative, split exactly, computed by the database',
-    day?.net_egp === -20000 &&
-    day.driver_egp + day.family_egp + day.marwa_egp === -20000 &&
-    day.family_egp === -10000,
+  check('…stored in full, and shared by nobody',
+    day?.net_egp === -20000 && day.indirect_egp === 25000 &&
+    day.driver_egp + day.family_egp + day.marwa_egp === 0,
     `net ${day?.net_egp} → Joe ${day?.driver_egp} · family ${day?.family_egp} · Marwa ${day?.marwa_egp}`)
 
+  // Nothing posts until Abdo settles it: the family owes Joe, and how much of
+  // that is maintenance and how much is a fine is his call to record.
   const { data: due } = await admin.from('account_balances').select('balance')
     .eq('system_key', 'due_from_driver').single()
-  check('…and the family share reached the ledger, not just the day table',
-    Number(due.balance) === -10000, `due_from_driver = ${due.balance}`)
+  check('…and it posts nothing to the ledger until Abdo settles it',
+    Number(due.balance) === 0 && day.journal_id === null,
+    `due_from_driver = ${due.balance} · journal ${day?.journal_id}`)
   await page.dispose()
 }
 

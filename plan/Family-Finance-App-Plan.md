@@ -386,7 +386,9 @@ Three more were settled once the demo made them concrete:
 
 | # | Question | Decision |
 |---|---|---|
-| **D10** | A day where costs exceed takings | **It goes negative**, and the loss is shared in the same ratios as a profit — Joe a third, the family three quarters of the rest, Marwa a quarter. Not floored: the ledger runs over time, so a bad day nets off against a good one. |
+| **D10** | A day where costs exceed takings | ~~It goes negative and the loss is shared.~~ **Replaced by D13 on 4 September 2026.** |
+| **D13** | A day where costs exceed takings | **The loss is not shared — the family carries it.** Joe records the day in full, because hiding the cost would make the car look cheaper than it is, but nobody takes a share of it. He paid out of his own pocket and Abdo makes him whole: the day waits for Abdo, who records the shortfall as an ordinary family expense in a category he picks, with a note saying what it was — "car maintenance", "traffic fine" — and hands Joe the cash. |
+| **D14** | Marwa's quarter | **It comes through Abdo, and is paid with her allowance.** Joe pays the costs, takes his third, and hands the rest — the family's share *and* Marwa's — to Abdo. So her quarter is not family income: it is money the family holds on her behalf until it goes out with her monthly allowance, as one payment. |
 | **D11** | When does Joe hand cash over? | **Whenever suits him** — daily, every ten days, no fixed rhythm. He *records* days; Abdo *confirms* a handover when the money is in his hand. Until then it is money Joe holds, not money the family has. |
 | **D12** | A handover that comes up short | **Carried, not written off.** If 1,725 is due and 1,700 arrives, Joe still owes 25 and it is added to his next handover. The balance of `due_from_driver` is the carried amount. |
 

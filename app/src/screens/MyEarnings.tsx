@@ -32,9 +32,12 @@ export default function MyEarnings() {
   const mine = month.reduce((a, x) => a + x.driver_egp, 0)
   const net = month.reduce((a, x) => a + x.net_egp, 0)
   // Only what he has recorded and not handed over. A settled day is finished.
+  // D14: he hands Abdo the family's share AND Marwa's, so both are counted.
   const owed = (d?.days ?? [])
     .filter(x => x.status === 'recorded')
-    .reduce((a, x) => a + x.family_egp, 0)
+    .reduce((a, x) => a + x.family_egp + x.marwa_egp, 0)
+  // D13: days he is out of pocket on, waiting for Abdo to settle.
+  const waiting = (d?.days ?? []).filter(x => x.net_egp < 0 && !x.loss_journal_id)
 
   return (
     <div className="stack">
@@ -47,7 +50,11 @@ export default function MyEarnings() {
              note={t('me_owed_note')} />
       </div>
 
-      {!pending && net < 0 && <div className="notice flat">{t('net_negative_note')}</div>}
+      {!pending && !!waiting.length && (
+        <div className="notice flat">
+          {t('me_waiting_settle')} · {money(waiting.reduce((a, x) => a + -x.net_egp, 0), lang)}
+        </div>
+      )}
 
       <div className="card">
         <div className="cardhead"><h2>{t('your_days')}</h2></div>

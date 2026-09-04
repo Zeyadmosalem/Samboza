@@ -4,8 +4,9 @@ import { useT, money } from '../lib/i18n'
 import { useLoad } from '../lib/useLoad'
 import type { Family, Person, Role } from '../lib/supabase'
 import {
-  balances, carDays, carExpensesFor, confirmHandover, fmtDay, handovers,
-  monthStart, newClientUuid, systemBalance, toPiastres, today, voidCarDay,
+  HANDOVER_ALARM_DAYS, HANDOVER_NUDGE_DAYS, balances, carDays, carExpensesFor,
+  categories, confirmHandover, daysSince, fmtDay, handovers, monthStart,
+  newClientUuid, settleCarLoss, systemBalance, toPiastres, today, voidCarDay,
   type CarDay,
 } from '../lib/data'
 
@@ -34,23 +35,40 @@ export default function Car() {
   const [reason, setReason] = useState('')
 
   const load = useLoad(async () => {
+    // 60 rows: the queue is expected to hold up to a month of daily records,
+    // and asking for the whole table every time the screen opens is how a
+    // free-tier database gets slow for no reason.
     const days = await carDays({ familyId: family.id, limit: 60 })
-    const [bal, hos, costs] = await Promise.all([
+    const [bal, hos, costs, cats] = await Promise.all([
       balances(family.id),
       handovers(family.id),
       carExpensesFor(days.map(d => d.id)),
+      categories(family.id),
     ])
-    return { days, bal, hos, costs }
+    return { days, bal, hos, costs, cats }
   }, [family.id])
 
   const d = load.data
   const pending = load.loading || load.failed
-  const outstanding = d?.days.filter(x => x.status === 'recorded') ?? []
+  // Two different queues. Days that earned money are waiting to be HANDED
+  // OVER; days that lost money are waiting for Abdo to SETTLE them, and
+  // mixing them into one list would ask him to tick a day that owes nothing.
+  const outstanding = d?.days.filter(
+    x => x.status === 'recorded' && x.family_egp + x.marwa_egp > 0) ?? []
+  const losses = d?.days.filter(x => x.net_egp < 0 && !x.loss_journal_id) ?? []
   const monthDays = d?.days.filter(x => x.drive_date >= monthStart()) ?? []
   const held = d ? systemBalance(d.bal, 'due_from_driver') : 0
+  const marwaOwed = d ? -systemBalance(d.bal, 'car_share_payable') : 0
+
+  // The nudge. Abdo settles with Joe every ten days or so; the queue copes
+  // with a month, and past that it is worth saying so plainly.
+  const oldest = outstanding.length
+    ? Math.max(...outstanding.map(x => daysSince(x.drive_date)))
+    : 0
 
   const pickedDays = outstanding.filter(x => picked.has(x.id))
-  const owed = pickedDays.reduce((a, x) => a + x.family_egp, 0)
+  // D14: the envelope holds the family's share and Marwa's together.
+  const owed = pickedDays.reduce((a, x) => a + x.family_egp + x.marwa_egp, 0)
 
   function toggle(id: string) {
     setPicked(s => {
@@ -97,11 +115,25 @@ export default function Car() {
              value={String(monthDays.filter(x => x.worked).length)} />
         <Kpi label={t('car_net_month')} pending={pending}
              value={money(monthDays.reduce((a, x) => a + x.net_egp, 0), lang)} />
-        <Kpi label={t('car_family_month')} pending={pending}
-             value={money(monthDays.reduce((a, x) => a + x.family_egp, 0), lang)} tone="in" />
+        <Kpi label={t('car_owed_marwa')} pending={pending} value={money(marwaOwed, lang)}
+             note={t('car_owed_marwa_note')} />
       </div>
 
       {err && <div className="notice warn">{err}</div>}
+
+      {!pending && oldest >= HANDOVER_NUDGE_DAYS && (
+        <div className={'notice' + (oldest >= HANDOVER_ALARM_DAYS ? ' warn' : '')}>
+          {oldest >= HANDOVER_ALARM_DAYS ? t('car_nudge_hard') : t('car_nudge')}
+          {' · '}{t('car_nudge_oldest')} {fmtDay(
+            outstanding.reduce((a, x) => (x.drive_date < a ? x.drive_date : a),
+                               outstanding[0].drive_date), lang)}
+        </div>
+      )}
+
+      {!pending && !!losses.length && isAdmin && (
+        <LossQueue days={losses} costs={d!.costs} cats={d!.cats} lang={lang}
+                   onDone={load.reload} />
+      )}
 
       <div className="card">
         <div className="cardhead">
@@ -185,6 +217,101 @@ export default function Car() {
             )
           })}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * D13. These days cost more than they took, so nobody shared them and nothing
+ * posted. Joe is out of pocket until Abdo records the shortfall as a family
+ * expense and hands him the cash.
+ *
+ * The category and the note are Abdo's to choose, and the note is not
+ * optional in spirit even though the column allows null: "car maintenance"
+ * six months from now is the difference between a record and a mystery.
+ */
+function LossQueue({ days, costs, cats, lang, onDone }: {
+  days: CarDay[]; costs: any[]; cats: any[]; lang: 'en' | 'ar'; onDone: () => void
+}) {
+  const { t } = useT()
+  const [open, setOpen] = useState<string | null>(null)
+  const [categoryId, setCategoryId] = useState('')
+  const [memo, setMemo] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const expense = cats.filter((c: any) => c.kind === 'expense')
+
+  async function settle(id: string) {
+    setErr(null)
+    if (!categoryId) return setErr(t('err_category'))
+    setBusy(true)
+    try {
+      await settleCarLoss({ dayId: id, categoryId, memo, clientUuid: newClientUuid() })
+      setOpen(null); setCategoryId(''); setMemo('')
+      onDone()
+    } catch (e) {
+      setErr((e as { message?: string }).message ?? t('err_load'))
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="card">
+      <div className="cardhead">
+        <h2>{t('car_needs_you')}</h2>
+        <span className="badge warn">{days.length}</span>
+      </div>
+      <p className="sub">{t('car_needs_you_sub')}</p>
+      {err && <p className="errmsg">{err}</p>}
+
+      <div className="rows">
+        {days.map(x => {
+          const mine = costs.filter((c: any) => c.car_day_id === x.id)
+          return (
+            <div className="row alrow" key={x.id}>
+              <div className="dot" style={{ background: 'var(--expense)' }} />
+              <div className="rowmain">
+                <div className="rowtitle">{fmtDay(x.drive_date, lang)}</div>
+                <div className="rowsub">
+                  {money(x.gross_egp, lang)} − {money(x.direct_egp + x.indirect_egp, lang)}
+                  {!!mine.length && <> · {mine.map((c: any) =>
+                    c.description || t(`cost_${c.label}` as any)).join(', ')}</>}
+                </div>
+              </div>
+              <div className="amt minus">{money(x.net_egp, lang)}</div>
+              <button className="btn sm ghost"
+                      onClick={() => { setOpen(open === x.id ? null : x.id); setCategoryId(''); setMemo('') }}>
+                {t('car_settle')}
+              </button>
+
+              {open === x.id && (
+                <div className="rateedit">
+                  <div className="field">
+                    <label>{t('f_category')}</label>
+                    <select className="input" value={categoryId} autoFocus
+                            onChange={e => setCategoryId(e.target.value)}>
+                      <option value="">—</option>
+                      {expense.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {lang === 'ar' ? c.name_ar : c.name_en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>{t('car_settle_note')}</label>
+                    <input className="input" value={memo} placeholder={t('car_settle_eg')}
+                           onChange={e => setMemo(e.target.value)} />
+                  </div>
+                  <button className="btn sm" disabled={busy} onClick={() => void settle(x.id)}>
+                    {busy ? t('saving') : `${t('car_settle_confirm')} ${money(-x.net_egp, lang)}`}
+                  </button>
+                  <p className="hint">{t('car_settle_hint')}</p>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

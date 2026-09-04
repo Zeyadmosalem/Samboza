@@ -101,6 +101,7 @@ export interface CarDay {
   status: 'recorded' | 'settled' | 'off'
   submitted_by: string
   journal_id: string | null
+  loss_journal_id: string | null
   voided_at: string | null
   void_reason: string | null
   handover_id: string | null
@@ -497,4 +498,42 @@ export async function carExpensesFor(dayIds: string[]) {
     .in('car_day_id', dayIds)
   if (error) throw error
   return (data ?? []) as CarExpense[]
+}
+
+/**
+ * D11 + the family's own cadence: Joe hands over when it suits him, and Abdo
+ * should be nudged rather than nagged. The queue is expected to hold up to a
+ * month of days, which is why the Car screen asks for 60 rows and no more —
+ * a driver recording daily for a month is 30 of them.
+ */
+export const HANDOVER_NUDGE_DAYS = 10
+export const HANDOVER_ALARM_DAYS = 30
+
+/** Whole days between an ISO day and today, in local time. */
+export function daysSince(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const then = new Date(y, m - 1, d)
+  const now = new Date()
+  return Math.floor((now.setHours(0, 0, 0, 0) - then.getTime()) / 86_400_000)
+}
+
+/**
+ * D13: a day that cost more than it took is settled by the family, not shared.
+ * Abdo names the category and says what it was — a shortfall with no
+ * explanation is the kind of entry that starts an argument six months later.
+ */
+export async function settleCarLoss(args: {
+  dayId: string
+  categoryId: string
+  memo?: string | null
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('settle_car_loss', {
+    p_day: args.dayId,
+    p_category: args.categoryId,
+    p_memo: args.memo ?? null,
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
 }

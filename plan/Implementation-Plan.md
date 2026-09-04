@@ -201,10 +201,24 @@ Build in this order. Each step is demoable to the family on its own.
      `record_car_day()` derives both from the same lines.
    - **A day is voided, never edited.** Joe will mistype one. The journal is
      reversed and the date freed, so the correction is on the record.
-   - **Marwa's share stays out of the family's books**, because Joe settles it
-     with her — which is what `confirm_handover` summing `family_egp` alone has
-     always assumed. If it should route through Abdo instead, that is one more
-     account and one more line. **Worth confirming with the family.**
+   - **Marwa's share was assumed to be settled by Joe. It is not** (D14): it
+     comes through Abdo with the family's share and goes out with her monthly
+     allowance. So a day posts three lines, not two, and her quarter is a
+     liability rather than income. (0013)
+   - **A loss is not shared** (D13, replacing D10). It is recorded in full and
+     posts nothing; Abdo settles it as a family expense with a note. Which
+     also removed the rounding hazard the whole system was carrying — PG and
+     JS only ever disagreed on negative halves, and no share can be negative
+     now. (0013)
+   - **Adding a foreign key broke sign-in for everybody.** `families.car_share_person`
+     is a second relationship between `people` and `families`, so PostgREST
+     refused the auth query's embed as ambiguous rather than guessing. The
+     RLS suite could never have caught it — it is PostgREST behaviour, not
+     database behaviour — and the browser check did, on the first run.
+     The embed now names its foreign key.
+   - **Abdo is nudged at ten days** and told plainly at thirty. The Car screen
+     asks for 60 days at most: a month of daily records is 30 rows, and
+     fetching the whole table on every visit is how a free tier gets slow.
 5. **Remittances** — multi-currency in, rate stored with the record.
 6. **Loans.**
 7. **Reports** — the four charts.

@@ -23,11 +23,12 @@ interface Draft {
  *
  * The split shown here is a preview computed in `splitPreview`, and
  * `record_car_day` computes the stored one in SQL from the same lines. That
- * duplication is deliberate — he should see what he is about to submit — but
- * the rounding rule had to be copied exactly: Postgres rounds half away from
- * zero, JavaScript rounds half up, and they disagree on exact negative halves.
- * Days can be negative (D10), so a naive Math.round would show him one figure
- * and store another on roughly one losing day in twelve.
+ * duplication is deliberate — he should see what he is about to submit — and
+ * the rounding rule is copied exactly: Postgres rounds half away from zero,
+ * JavaScript rounds half up. They only ever disagreed on negative halves, and
+ * D13 took losses out of the split entirely, so the hazard is now gone rather
+ * than merely handled. The rule stays copied because it costs nothing and the
+ * next person to make a share negative should not have to rediscover it.
  */
 export default function CarDay() {
   const { family } = useOutletContext<Ctx>()
@@ -50,7 +51,11 @@ export default function CarDay() {
   const indirect = lines.filter(c => c.cls === 'indirect').reduce((a, c) => a + c.p, 0)
   // D2: every cost comes off BEFORE anyone's share.
   const net = grossP - direct - indirect
-  const split = splitPreview(net)
+  // D13: a day that lost money is shared by nobody. Joe paid out of pocket
+  // and Abdo makes him whole, so showing him a negative third would be
+  // telling him he owes the family for a fine he already paid.
+  const lost = net < 0
+  const split = lost ? { driver: 0, family: 0, marwa: 0 } : splitPreview(net)
 
   function addCost() {
     const label: CostLabel = 'fuel'
@@ -194,12 +199,17 @@ export default function CarDay() {
             <Line label={t('cd_gross')} value={money(grossP, lang)} />
             <Line label={t('cd_direct_total')} value={money(-direct, lang)} muted />
             <Line label={t('cd_indirect_total')} value={money(-indirect, lang)} muted />
-            <Line label={t('cd_net')} value={money(net, lang)} strong tone={net < 0 ? 'out' : 'in'} />
+            <Line label={t('cd_net')} value={money(net, lang)} strong tone={lost ? 'out' : 'in'} />
             <hr />
-            <Line label={t('cd_your_third')} value={money(split.driver, lang)} />
-            <Line label={t('cd_family')} value={money(split.family, lang)} />
-            <Line label={t('cd_marwa')} value={money(split.marwa, lang)} />
-            {net < 0 && <p className="hint">{t('net_negative_note')}</p>}
+            {lost ? (
+              <p className="hint">{t('cd_loss_note')}</p>
+            ) : (
+              <>
+                <Line label={t('cd_your_third')} value={money(split.driver, lang)} />
+                <Line label={t('cd_family')} value={money(split.family, lang)} />
+                <Line label={t('cd_marwa')} value={money(split.marwa, lang)} />
+              </>
+            )}
           </div>
         </>
       )}

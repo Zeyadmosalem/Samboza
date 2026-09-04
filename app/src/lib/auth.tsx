@@ -94,7 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ;(async () => {
       const { data, error } = await supabase
         .from('people')
-        .select('*, family:families(*)')
+        // The relationship is NAMED, and must stay named. There are now two
+        // foreign keys between `people` and `families` — this one, and
+        // `families.car_share_person` pointing back — and PostgREST refuses
+        // an ambiguous embed rather than guessing. Dropping the hint breaks
+        // sign-in for every single person, which is exactly what adding that
+        // second key did until a browser check caught it.
+        .select('*, family:families!people_family_id_fkey(*)')
         .eq('auth_user_id', session.user.id)
         .eq('active', true)
 
