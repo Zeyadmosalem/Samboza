@@ -16,6 +16,7 @@ import MyEarnings from './screens/MyEarnings'
 import Remittance from './screens/Remittance'
 import Loans from './screens/Loans'
 import Reports from './screens/Reports'
+import SetPassword from './screens/SetPassword'
 
 /** Steps 1–7 of Phase 2 are real. Offline sync is what remains, plus the
  *  personal books §3.6 promises Ghada. */
@@ -41,10 +42,16 @@ const SCREENS = [
 ]
 
 function Gate() {
-  const { loading, session, person, membershipError, reload } = useAuth()
+  const { loading, session, person, membershipError, reload, recovery } = useAuth()
   const { t } = useT()
 
   if (loading) return <div className="centred">{t('loading')}</div>
+
+  // Before everything else. Someone who followed a reset link holds a real
+  // session, so every check below would pass and drop them on the dashboard
+  // with the thing they came to do quietly skipped — still on the password
+  // they could not remember.
+  if (recovery && session) return <SetPassword />
   // `person` without `session` means: offline, with a session on this device
   // and a remembered identity. Sending them to the sign-in screen would be
   // asking them to authenticate against a server they cannot reach.

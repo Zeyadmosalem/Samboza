@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { PASSWORD } from './people.mjs'
 
 const CANDIDATES = [
   process.env.CHROME_PATH,
@@ -83,9 +84,10 @@ export async function launch(port = 9333) {
           return false
         },
         text: sel => ev(`document.querySelector(${JSON.stringify(sel)})?.innerText ?? null`),
-        /** A PNG of the full page, for looking at layout the way a reader does. */
-        screenshot: () => send('Page.captureScreenshot',
-          { format: 'png', captureBeyondViewport: true }, s),
+        /** A PNG of the full page, for looking at layout the way a reader
+         *  does. Pass { clip } to cut an exact box out of it instead. */
+        screenshot: (opts = {}) => send('Page.captureScreenshot',
+          { format: 'png', captureBeyondViewport: true, ...opts }, s),
         click: sel => ev(`document.querySelector(${JSON.stringify(sel)})?.click(), true`),
         /** Really offline, not a flag the page can ignore: this is what
          *  navigator.onLine reads and what every fetch hits. */
@@ -120,7 +122,7 @@ export const type = (sel, value, kind = 'input') => `
     return true;
   })()`
 
-export async function signIn(page, app, email, password = 'Samboza2026!') {
+export async function signIn(page, app, email, password = PASSWORD) {
   await page.go(app)
   if (!await page.wait(`!!document.querySelector('input[type=password]')`)) return false
   await page.ev(type('input[type=email]', email))

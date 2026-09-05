@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Samboza Family Finance</title>
+
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <!-- iOS reads this and ignores the manifest entirely. -->
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Samboza" />
+    <!-- The status bar, matched to the top bar underneath it in each theme.
+         One fixed colour here would leave a white strip above a dark app. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#181c1b" media="(prefers-color-scheme: dark)" />
     <script>
       // Apply the remembered theme before first paint, so a dark-mode phone
       // never flashes white on open.

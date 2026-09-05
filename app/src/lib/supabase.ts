@@ -20,7 +20,19 @@ export const supabase = createClient(url, anon, {
   auth: {
     persistSession: true,      // they use a phone and a laptop; both stay signed in
     autoRefreshToken: true,
-    detectSessionInUrl: false, // no magic-link flow yet
+    /*
+     * Reset links arrive as a URL fragment and have to be picked up on load,
+     * or the person clicks the link, lands on the sign-in screen, and is
+     * asked for the password they clicked the link because they do not have.
+     *
+     * flowType is left at the default (implicit) deliberately. PKCE keeps the
+     * token out of the URL, which is better, and it requires the verifier to
+     * be in the storage of the browser that ASKED for the reset — so Ghada
+     * requesting it on her laptop and opening Gmail on her phone would get a
+     * link that cannot work. Cross-device is the normal case in this family,
+     * not the edge one.
+     */
+    detectSessionInUrl: true,
     storageKey: 'samboza-auth',
   },
 })

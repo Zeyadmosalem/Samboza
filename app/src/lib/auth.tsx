@@ -57,7 +57,21 @@ interface AuthState {
   /** True when the memberships came from the last successful load rather than
    *  from the server. The app works; it just could not check. */
   stale: boolean
+  /**
+   * Arrived here from a reset link and is allowed to set a password without
+   * knowing the old one. Supabase hands out a real session for this, so the
+   * flag is not what authorises it — it is what stops the app from dropping
+   * them on the dashboard, signed in, with the thing they came to do
+   * silently skipped.
+   */
+  recovery: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  /** Send a reset link. Says nothing about whether the address exists. */
+  sendReset: (email: string) => Promise<{ error: string | null }>
+  /** Set a new password: from a reset link, or while signed in. */
+  setPassword: (password: string) => Promise<{ error: string | null }>
+  /** Dismiss the reset screen once the new password is saved. */
+  finishRecovery: () => void
   signOut: () => Promise<void>
   chooseFamily: (familyId: string) => void
   /** Retry the membership lookup after a failure. */
@@ -74,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Showing what we last knew, because the server could not be reached. */
   const [stale, setStale] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [recovery, setRecovery] = useState(false)
   const [familyId, setFamilyId] = useState<string | null>(
     () => localStorage.getItem('samboza-family')
   )
@@ -128,7 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       if (!data.session) setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      // The link in the email produces a session like any other sign-in. If
+      // nothing noticed, the person would land on the dashboard already
+      // signed in and never be asked for the new password they clicked the
+      // link to set — and would still be on the old one.
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
       setSession(s)
       if (!s) {
         setMemberships([])
@@ -249,6 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     memberships,
     membershipError,
     stale,
+    recovery,
     reload() {
       setLoading(true)
       setMembershipError(false)
@@ -267,7 +288,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(SIGNED_IN_AT, String(Date.now()))
       return { error: null }
     },
+    async sendReset(email) {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        // Where the link lands. Must also be listed in Supabase under
+        // Authentication -> URL Configuration -> Redirect URLs, or the link
+        // silently bounces to the site root and the person is told nothing.
+        { redirectTo: `${window.location.origin}/reset` },
+      )
+      // Never distinguishes a real address from one that is not on the
+      // system: the reply to "did you send it" must be the same either way,
+      // or this becomes a way to ask which of the family have accounts.
+      //
+      // The rate limit is the exception, and must be said out loud. A free
+      // project sends a couple of messages an hour, project-wide; swallowing
+      // that as success leaves somebody refreshing an inbox for a mail that
+      // was never sent. It gives nothing away either — the limit is on the
+      // project, not on the address.
+      if (!error) return { error: null }
+      if (/rate|too many|limit/i.test(error.message)) return { error: 'err_reset_rate' }
+      return { error: 'err_reset_failed' }
+    },
+    async setPassword(password) {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) return { error: /should be|least|weak/i.test(error.message) ? 'err_pw_weak' : 'err_pw_failed' }
+      localStorage.setItem(SIGNED_IN_AT, String(Date.now()))
+      return { error: null }
+    },
+    /** Leave the reset screen. Separate from setPassword because clearing the
+     *  flag there would unmount the screen before it could say it worked. */
+    finishRecovery() {
+      setRecovery(false)
+    },
     async signOut() {
+      setRecovery(false)
       localStorage.removeItem(SIGNED_IN_AT)
       // Forget the cached identity too. It grants nothing, but a name and a
       // family sitting in a shared laptop's storage after someone signs out

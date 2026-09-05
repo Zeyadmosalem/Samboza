@@ -1,0 +1,12 @@
+# Every path is the same file: this is a single-page app, and the router
+# decides what to draw. Without it, /reset — the address a password link
+# lands on — is a 404 from the host, and the person who clicked it is told
+# the page does not exist.
+#
+# 200, not 301: the browser must keep the URL it asked for, or the router
+# never sees which screen was wanted.
+#
+# Routes are one segment deep on purpose. index.html references its assets
+# relatively (base './', so Capacitor can serve from disk in phase 5), and
+# "./assets/x.js" resolves correctly from /reset but not from /a/b.
+/*  /index.html  200
