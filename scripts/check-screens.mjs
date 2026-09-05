@@ -336,6 +336,53 @@ check('Add Transaction: a member submits, and it lands pending',
     undone.data === true && back === before, `cash back to ${back}`)
 }
 
+/* -------------------------------------------------------------- the loans */
+{
+  const cashBefore = Number((await admin.from('account_balances').select('balance')
+    .eq('system_key', 'cash').single()).data.balance)
+
+  const loan = await abdo.rpc('record_loan', {
+    p_family: fam.id, p_direction: 'borrowed', p_counterparty: 'SCREEN CHECK lender',
+    p_principal: 1000000, p_taken_on: TODAY, p_description: 'roof',
+    p_client_uuid: randomUUID(),
+  })
+  check('Loans: the admin registers one the family took', !loan.error, loan.error?.message ?? '')
+
+  const cashAfter = Number((await admin.from('account_balances').select('balance')
+    .eq('system_key', 'cash').single()).data.balance)
+  const debt = Number((await admin.from('account_balances').select('balance')
+    .eq('system_key', 'loan_liability').single()).data.balance)
+  check('\u2026and the cash AND the debt both reach the ledger',
+    cashAfter - cashBefore === 1000000 && debt === -1000000,
+    `cash +${cashAfter - cashBefore} \u00b7 loan_liability ${debt}`)
+
+  const { data: bal } = await abdo.from('loan_balances').select('*')
+    .eq('loan_id', loan.data ?? '').single()
+  check('\u2026and the balance is derived, starting at the principal',
+    bal?.remaining_egp === 1000000 && bal.status === 'outstanding' && bal.repaid_egp === 0,
+    `${bal?.status} \u00b7 ${bal?.remaining_egp} left`)
+
+  await abdo.rpc('record_loan_payment', {
+    p_loan: loan.data, p_amount: 400000, p_paid_on: TODAY, p_client_uuid: randomUUID(),
+  })
+  const { data: after } = await abdo.from('loan_balances').select('*')
+    .eq('loan_id', loan.data ?? '').single()
+  check('\u2026a repayment moves the status and the balance together',
+    after?.status === 'partial' && after.remaining_egp === 600000,
+    `${after?.status} \u00b7 ${after?.remaining_egp} left`)
+
+  const tooMuch = await abdo.rpc('record_loan_payment', {
+    p_loan: loan.data, p_amount: 9900000, p_paid_on: TODAY, p_client_uuid: randomUUID(),
+  })
+  check('\u2026and repaying more than is outstanding is refused',
+    /more than the/.test(tooMuch.error?.message ?? ''),
+    tooMuch.error?.message ?? '*** over-repaid ***')
+
+  const member = await zeyad.from('loan_balances').select('*')
+  check('\u2026a member cannot see what the family owes',
+    !member.error && member.data.length === 0, `${member.data?.length} rows`)
+}
+
 /* ------------------------------------------------------ History paginates */
 {
   const one = await abdo.from('ledger_feed').select('*').eq('family_id', fam.id)
@@ -349,6 +396,20 @@ check('Add Transaction: a member submits, and it lands pending',
 
 /* ------------------------------------------------------------- cleanup -- */
 await admin.from('member_expenses').delete().like('description', 'SCREEN CHECK%')
+{
+  const { data: ls } = await admin.from('loans').select('id,journal_id')
+  for (const l of ls ?? []) {
+    for (const pmt of (await admin.from('loan_payments').select('id,journal_id')
+                         .eq('loan_id', l.id)).data ?? []) {
+      await admin.from('loan_payments').delete().eq('id', pmt.id)
+      await admin.from('entries').delete().eq('journal_id', pmt.journal_id)
+      await admin.from('journals').delete().eq('id', pmt.journal_id)
+    }
+    await admin.from('loans').delete().eq('id', l.id)
+    await admin.from('entries').delete().eq('journal_id', l.journal_id)
+    await admin.from('journals').delete().eq('id', l.journal_id)
+  }
+}
 {
   const { data: rms } = await admin.from('remittances').select('id,journal_id')
   for (const r of rms ?? []) {

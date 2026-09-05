@@ -168,6 +168,17 @@ for (const person of PEOPLE) {
       view.form === (person.role === 'Admin'), `form ${view.form}`)
   }
 
+  if (seen.nav.includes('/loans')) {
+    await page.click('a[href="/loans"]')
+    const ok = await page.wait(
+      `document.querySelectorAll('.kpi').length === 3 && !document.querySelector('.kpi .v.muted')`)
+    const view = await page.ev(`({ form: !!document.querySelector('form.form') })`)
+    check(`${person.who}: Loans shows what is owed either way`, ok,
+      oneLine(await page.text('.kpis'), 110))
+    check(`${person.who}: only the admin can register one`,
+      view.form === (person.role === 'Admin'), `form ${view.form}`)
+  }
+
   if (seen.nav.includes('/myearnings')) {
     await page.click('a[href="/myearnings"]')
     const ok = await page.wait(

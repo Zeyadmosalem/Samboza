@@ -82,6 +82,9 @@ const ACCOUNTS = [
   // earned — so a liability, not income.
   { key: 'car_share_payable', kind: 'liability', name: 'Car share owed' },
   { key: 'loan_liability',    kind: 'liability', name: 'Loans owed' },
+  // What we have lent out is an asset. Sharing one account with what we owe
+  // would net the two into a single number that means nothing.
+  { key: 'loan_receivable',   kind: 'asset',  name: 'Loans owed to us' },
 ]
 
 const CATEGORIES = [

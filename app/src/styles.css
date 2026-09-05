@@ -400,3 +400,12 @@ select.input { appearance:none; background-image:none; }
 .grid3 .field + .field { margin-top:0; }
 .grid3 + .hint { margin-block-start:8px; font-size:11.5px; color:var(--sub); }
 @media (max-width:900px) { .grid3 { grid-template-columns:1fr; } }
+
+/* A loan's repayments, inside its own expanded row. */
+.paylist { flex-basis:100%; border-block-start:1px solid var(--line); margin-block-start:4px; }
+.payline {
+  display:flex; align-items:center; gap:12px; padding:7px 0; font-size:12.5px;
+  border-block-end:1px solid var(--line);
+}
+.payline:last-child { border-block-end:0; }
+.payline .amt { flex:1; text-align:end; }

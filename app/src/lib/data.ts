@@ -628,3 +628,102 @@ export function parseRate(input: string): number | null {
   const n = Number(cleaned)
   return Number.isFinite(n) && n > 0 ? n : null
 }
+
+/* ------------------------------------------------------------------ loans */
+
+export type LoanDirection = 'borrowed' | 'lent'
+
+export interface LoanBalance {
+  loan_id: string
+  family_id: string
+  direction: LoanDirection
+  counterparty: string
+  principal_egp: number
+  taken_on: string
+  description: string | null
+  repaid_egp: number
+  remaining_egp: number
+  last_paid_on: string | null
+  status: 'outstanding' | 'partial' | 'repaid'
+}
+
+export interface LoanPayment {
+  id: string
+  loan_id: string
+  amount_egp: number
+  paid_on: string
+  voided_at: string | null
+}
+
+/** Principal, repaid and remaining — derived in SQL every time, never stored. */
+export async function loans(familyId: string) {
+  const { data, error } = await supabase
+    .from('loan_balances')
+    .select('*')
+    .eq('family_id', familyId)
+    .order('taken_on', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as LoanBalance[]
+}
+
+export async function loanPayments(loanIds: string[]) {
+  if (!loanIds.length) return []
+  const { data, error } = await supabase
+    .from('loan_payments')
+    .select('id,loan_id,amount_egp,paid_on,voided_at')
+    .in('loan_id', loanIds)
+    .is('voided_at', null)
+    .order('paid_on', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as LoanPayment[]
+}
+
+export async function recordLoan(args: {
+  familyId: string
+  direction: LoanDirection
+  counterparty: string
+  principal: number
+  takenOn: string
+  description?: string | null
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('record_loan', {
+    p_family: args.familyId,
+    p_direction: args.direction,
+    p_counterparty: args.counterparty,
+    p_principal: args.principal,
+    p_taken_on: args.takenOn,
+    p_description: args.description ?? null,
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function recordLoanPayment(args: {
+  loanId: string
+  amount: number
+  paidOn: string
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('record_loan_payment', {
+    p_loan: args.loanId,
+    p_amount: args.amount,
+    p_paid_on: args.paidOn,
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function voidLoan(id: string, reason: string) {
+  const { data, error } = await supabase.rpc('void_loan', { p_id: id, p_reason: reason })
+  if (error) throw error
+  return data as boolean
+}
+
+export async function voidLoanPayment(id: string, reason: string) {
+  const { data, error } = await supabase.rpc('void_loan_payment', { p_id: id, p_reason: reason })
+  if (error) throw error
+  return data as boolean
+}

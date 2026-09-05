@@ -235,7 +235,16 @@ Build in this order. Each step is demoable to the family on its own.
    now runs on Africa/Cairo, the family carries its timezone as data, and the
    app asks the family rather than the device, so Ghada's phone in Saudi
    cannot record a day the rest of them have not reached. (0015)
-6. **Loans.**
+6. **Loans.** **DONE.** §3.5 asks for them "registered separately from
+   ordinary income so the family can see what it owes" — separately in the
+   REPORT, and not separately from the ledger. Borrowing 10,000 puts 10,000
+   of real cash in Abdo's hand and a debt beside it, and a dashboard showing
+   the cash without the debt overstates what the family has. Lending needed
+   its own account: money out is an asset, and sharing `loan_liability` with
+   it would net the two into a number meaning nothing. Repaying more than is
+   outstanding is refused — an extra zero would leave the loan reading as
+   though the family were owed money it never lent. Status and balance stay
+   derived, as 0005 insisted. (0016)
 7. **Reports** — the four charts.
 8. **Offline + sync.** Client-generated UUIDs, and a submit that **reuses the
    same id on retry** — otherwise Joe on bad signal submits Tuesday twice.

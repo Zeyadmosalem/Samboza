@@ -155,7 +155,7 @@ and shared in the same ratios as a profit (D10). It is not floored at zero.
 |---|---|
 | Phase 0 — schema, RLS, tests | **done** · 9 migrations, 39 pgTAP assertions, green in CI |
 | Phase 1 — auth and the shell | **done** · five people sign in, each sees their own navigation |
-| Phase 2 — the money | **steps 1–4 of 8 done** · the ledger, allowances, approvals, the car |
+| Phase 2 — the money | **steps 1–6 of 8 done** · the ledger, allowances, approvals, the car, remittances, loans |
 | The glass restyle | after the screens exist, as planned |
 
 What works today: Abdo records income and expense straight into the double-entry
@@ -170,8 +170,12 @@ becomes money he is holding from the moment it is earned; Abdo confirms a
 handover when the cash is actually in his hand, and a short one is carried
 rather than written off.
 
-Still to come, in this order: remittances, loans, the four reports, offline
-sync — and the approval notification, without which the queue quietly rots.
+Ghada's remittances are recorded at the rate Abdo agreed, stored with the row.
+Loans sit in the ledger with the debt beside the cash they brought in.
+
+Still to come: the four reports, offline sync, the personal books §3.6
+promises Ghada — and the approval notification, without which the queue
+quietly rots.
 
 ### Before real money goes in
 

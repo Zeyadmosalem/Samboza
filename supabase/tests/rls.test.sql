@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(79);
+select plan(91);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -55,6 +55,8 @@ insert into accounts (id, family_id, kind, name, system_key) values
   -- handing it over and Abdo paying it out. A liability, not income.
   ('cccc0000-0000-4000-8000-000000000006','aaaaaaaa-0000-4000-8000-000000000001','liability','Car share owed','car_share_payable'),
   ('cccc0000-0000-4000-8000-000000000007','aaaaaaaa-0000-4000-8000-000000000001','income','Remittances','remittance_income'),
+  ('cccc0000-0000-4000-8000-000000000008','aaaaaaaa-0000-4000-8000-000000000001','liability','Loans owed','loan_liability'),
+  ('cccc0000-0000-4000-8000-000000000009','aaaaaaaa-0000-4000-8000-000000000001','asset','Loans owed to us','loan_receivable'),
   -- The OTHER family's cash. Nothing in Samboza may ever post to it.
   ('cccc0000-0000-4000-8000-000000000004','aaaaaaaa-0000-4000-8000-000000000002','asset','Their cash','cash');
 
@@ -542,6 +544,77 @@ select is(
      join journals j on j.id = e.journal_id
     where a.system_key = 'cash' and j.source_table = 'remittances'),
   0::bigint, 'and its entry is reversed rather than deleted');
+
+-- =====================================================================
+-- 0016 — loans: in the ledger, with the balance always derived.
+-- =====================================================================
+select lives_ok(
+  $$select record_loan('aaaaaaaa-0000-4000-8000-000000000001',
+      'borrowed', 'Uncle Sameh', 1000000, current_date, 'roof repair')$$,
+  'the admin registers a loan the family took');
+
+-- The cash is real and so is the debt. A screen that showed one without the
+-- other would overstate what the family has.
+select is(
+  (select sum(e.amount)::bigint from entries e
+     join accounts a on a.id = e.account_id
+    where a.system_key = 'loan_liability'),
+  -1000000::bigint, 'and the debt is in the ledger beside the cash it brought');
+
+select is(
+  (select remaining_egp::bigint from loan_balances where counterparty = 'Uncle Sameh'),
+  1000000::bigint, 'the balance starts at the whole principal');
+
+select lives_ok(
+  $$select record_loan_payment(
+      (select loan_id from loan_balances where counterparty = 'Uncle Sameh'),
+      400000, current_date)$$,
+  'a repayment is recorded');
+
+select is(
+  (select status from loan_balances where counterparty = 'Uncle Sameh'),
+  'partial', 'and the status follows from the payments, never from a column');
+
+select is(
+  (select remaining_egp::bigint from loan_balances where counterparty = 'Uncle Sameh'),
+  600000::bigint, 'as does what is left');
+
+-- An extra zero would drive the balance negative and leave the loan reading
+-- as though the family were owed money it never lent.
+select throws_ok(
+  $$select record_loan_payment(
+      (select loan_id from loan_balances where counterparty = 'Uncle Sameh'),
+      9900000, current_date)$$,
+  'P0001', null, 'repaying more than is outstanding is refused');
+
+select throws_ok(
+  $$select void_loan((select loan_id from loan_balances where counterparty = 'Uncle Sameh'),
+                     'changed my mind')$$,
+  'P0001', null, 'and a loan with repayments against it cannot be voided');
+
+-- Lending is the other direction, and needs its own account: netting the two
+-- together would produce a single number meaning nothing.
+select lives_ok(
+  $$select record_loan('aaaaaaaa-0000-4000-8000-000000000001',
+      'lent', 'Neighbour', 250000, current_date)$$,
+  'the admin registers a loan the family gave out');
+
+select is(
+  (select sum(e.amount)::bigint from entries e
+     join accounts a on a.id = e.account_id
+    where a.system_key = 'loan_receivable'),
+  250000::bigint, 'and it is an asset, not a smaller debt');
+
+select tests.be('33333333-3333-4333-8333-333333333333');
+select is(tests.rows_in('select 1 from loan_balances'), 0::bigint,
+  'a member cannot see what the family owes');
+
+select throws_ok(
+  $$select record_loan('aaaaaaaa-0000-4000-8000-000000000001',
+      'borrowed', 'Somebody', 100, current_date)$$,
+  '42501', null, 'nor register one');
+
+select tests.be('11111111-1111-4111-8111-111111111111');
 
 -- =====================================================================
 -- Cross-tenant. The whole multi-family promise rests on these two.
