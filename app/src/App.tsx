@@ -13,8 +13,9 @@ import Approvals from './screens/Approvals'
 import CarDay from './screens/CarDay'
 import Car from './screens/Car'
 import MyEarnings from './screens/MyEarnings'
+import Remittance from './screens/Remittance'
 
-/** Steps 1–4 of Phase 2 are real. The rest still hang from the shell as
+/** Steps 1–5 of Phase 2 are real. The rest still hang from the shell as
  *  placeholders, in the order the plan builds them. */
 const BUILT: Record<string, () => JSX.Element> = {
   dashboard: Dashboard,
@@ -26,6 +27,7 @@ const BUILT: Record<string, () => JSX.Element> = {
   carday: CarDay,
   car: Car,
   myearnings: MyEarnings,
+  remittance: Remittance,
 }
 
 const SCREENS = [

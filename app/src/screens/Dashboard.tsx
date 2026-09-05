@@ -3,8 +3,8 @@ import { useT, money } from '../lib/i18n'
 import { useLoad } from '../lib/useLoad'
 import type { Family, Person, Role } from '../lib/supabase'
 import {
-  balances, carDays, categories, fmtDay, ledgerFeed, memberExpenses,
-  allowanceRate, monthStart, systemBalance,
+  balances, carDays, categories, daysSince, fmtDay, ledgerFeed, memberExpenses,
+  allowanceRate, monthStart, remittances, systemBalance,
   type CarDay, type Category, type LedgerRow, type MemberExpense,
 } from '../lib/data'
 
@@ -84,13 +84,14 @@ function FamilyDashboard() {
   const { t, lang } = useT()
 
   const load = useLoad(async () => {
-    const [bal, month, recent, pending] = await Promise.all([
+    const [bal, month, recent, pending, rm] = await Promise.all([
       balances(family.id),
       ledgerFeed({ familyId: family.id, from: monthStart(), limit: 500 }),
       ledgerFeed({ familyId: family.id, limit: 8 }),
       memberExpenses({ familyId: family.id, status: 'pending', limit: 100 }),
+      remittances(family.id, 1),
     ])
-    return { bal, month, recent, pending }
+    return { bal, month, recent, pending, rm }
   }, [family.id])
 
   const d = load.data
@@ -112,6 +113,11 @@ function FamilyDashboard() {
         <Kpi label={t('kpi_with_driver')} pending={pending}
              value={money(d ? systemBalance(d.bal, 'due_from_driver') : 0, lang)}
              note={t('kpi_with_driver_note')} />
+        {/* §3.1: income here is lumpy and tied to visits, so how long since
+            the last one says more than any monthly average. */}
+        <Kpi label={t('kpi_days_since_rm')} pending={pending}
+             value={d?.rm[0] ? String(daysSince(d.rm[0].received_on)) : '—'}
+             note={d?.rm[0] ? fmtDay(d.rm[0].received_on, lang) : undefined} />
       </div>
 
       {!pending && !!d?.pending.length && (

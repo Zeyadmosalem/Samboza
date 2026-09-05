@@ -34,16 +34,27 @@ export function fmtDay(iso: string, lang: 'en' | 'ar') {
     { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(y, m - 1, d))
 }
 
-/** The first of the month a date falls in, as an ISO day string. */
-export const monthStart = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+/**
+ * WHOSE TODAY. Not the device's, and not the server's.
+ *
+ * The database runs on Africa/Cairo and refuses a date it has not reached, so
+ * a device an hour ahead gets "that day has not happened yet" — which is
+ * exactly what Ghada's phone in Saudi would do, and what any device does
+ * between midnight and 3am while the server is still on yesterday in UTC.
+ *
+ * Module state rather than a prop, because it is one fact about the family
+ * that every screen needs and nothing should be able to disagree about.
+ * AuthProvider sets it the moment the family resolves.
+ */
+let familyZone = 'Africa/Cairo'
+export const setFamilyZone = (tz?: string | null) => { familyZone = tz || 'Africa/Cairo' }
 
-/** Today in the user's own timezone — never `toISOString()`, which is UTC and
- *  hands Egypt the wrong day for two hours every evening. */
-export const today = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+/** Today, where the family lives. 'en-CA' formats as YYYY-MM-DD. */
+export const today = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: familyZone }).format(new Date())
+
+/** The first of the month the family is currently in. */
+export const monthStart = () => today().slice(0, 7) + '-01'
 
 /* ------------------------------------------------------------------ types */
 
@@ -509,12 +520,13 @@ export async function carExpensesFor(dayIds: string[]) {
 export const HANDOVER_NUDGE_DAYS = 10
 export const HANDOVER_ALARM_DAYS = 30
 
-/** Whole days between an ISO day and today, in local time. */
+/** Whole days between an ISO day and the family's today. */
 export function daysSince(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number)
-  const then = new Date(y, m - 1, d)
-  const now = new Date()
-  return Math.floor((now.setHours(0, 0, 0, 0) - then.getTime()) / 86_400_000)
+  const at = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((at(today()) - at(iso)) / 86_400_000)
 }
 
 /**
@@ -536,4 +548,83 @@ export async function settleCarLoss(args: {
   })
   if (error) throw error
   return data as string
+}
+
+/* ------------------------------------------------------------ remittances */
+
+export const CURRENCIES = ['EGP', 'SAR', 'USD'] as const
+export type Currency = typeof CURRENCIES[number]
+
+export interface Remittance {
+  id: string
+  from_person: string
+  amount_original: number
+  currency: Currency
+  fx_rate: number
+  amount_egp: number
+  received_on: string
+  visit_note: string | null
+  voided_at: string | null
+  void_reason: string | null
+}
+
+export async function remittances(familyId: string, limit = 40) {
+  const { data, error } = await supabase
+    .from('remittances')
+    .select('id,from_person,amount_original,currency,fx_rate,amount_egp,received_on,visit_note,voided_at,void_reason')
+    .eq('family_id', familyId)
+    .is('voided_at', null)
+    .order('received_on', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return (data ?? []) as Remittance[]
+}
+
+/**
+ * The EGP a remittance will come to — shown so nobody is surprised, computed
+ * again in SQL so nobody can supply it. Both round half away from zero, and
+ * amounts here are positive, so the two always agree.
+ */
+export const toEgp = (amountMinor: number, rate: number) =>
+  Math.sign(amountMinor * rate) * Math.round(Math.abs(amountMinor * rate))
+
+export async function recordRemittance(args: {
+  familyId: string
+  fromPerson: string
+  amountOriginal: number
+  currency: Currency
+  fxRate: number
+  receivedOn: string
+  visitNote?: string | null
+  clientUuid: string
+}) {
+  const { data, error } = await supabase.rpc('record_remittance', {
+    p_family: args.familyId,
+    p_from_person: args.fromPerson,
+    p_amount_original: args.amountOriginal,
+    p_currency: args.currency,
+    p_fx_rate: args.fxRate,
+    p_received_on: args.receivedOn,
+    p_visit_note: args.visitNote ?? null,
+    p_client_uuid: args.clientUuid,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function voidRemittance(id: string, reason: string) {
+  const { data, error } = await supabase.rpc('void_remittance', { p_id: id, p_reason: reason })
+  if (error) throw error
+  return data as boolean
+}
+
+/** "1,234.5" in a currency's own minor units. Same parser, different label. */
+export const toMinorUnits = toPiastres
+
+/** A rate is not money: it has six decimal places and no thousands grouping. */
+export function parseRate(input: string): number | null {
+  const cleaned = input.replace(/[,\s]/g, '').trim()
+  if (!cleaned || !/^\d*\.?\d*$/.test(cleaned)) return null
+  const n = Number(cleaned)
+  return Number.isFinite(n) && n > 0 ? n : null
 }

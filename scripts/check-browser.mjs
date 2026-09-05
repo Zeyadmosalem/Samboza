@@ -37,8 +37,10 @@ const oneLine = (text, max = 120) =>
   (text ?? '').split('\n').filter(Boolean).join(' · ').slice(0, max)
 
 const PEOPLE = [
-  { email: 'abdo@samboza.family',  who: 'Abdo',  role: 'Admin',  kpis: 4 },
-  { email: 'ghada@samboza.family', who: 'Ghada', role: 'Viewer', kpis: 4 },
+  // Five on the family dashboard since 0014: the plan asks for "days since
+  // last remittance" by name, because income here is lumpy and tied to visits.
+  { email: 'abdo@samboza.family',  who: 'Abdo',  role: 'Admin',  kpis: 5 },
+  { email: 'ghada@samboza.family', who: 'Ghada', role: 'Viewer', kpis: 5 },
   { email: 'zeyad@samboza.family', who: 'Zeyad', role: 'Member', kpis: 3 },
   { email: 'rewan@samboza.family', who: 'Rewan', role: 'Member', kpis: 3 },
   { email: 'joe@samboza.family',   who: 'Joe',   role: 'Driver', kpis: 4 },
@@ -149,6 +151,21 @@ for (const person of PEOPLE) {
     // Ghada watches; only Abdo can pick days to settle.
     check(`${person.who}: only the admin can select days to settle`,
       person.role === 'Admin' || view.confirm === 0, `${view.confirm} checkboxes`)
+  }
+
+  if (seen.nav.includes('/remittance')) {
+    await page.click('a[href="/remittance"]')
+    const ok = await page.wait(
+      `document.querySelectorAll('.kpi').length === 3 && !document.querySelector('.kpi .v.muted')`)
+    const view = await page.ev(`({
+      form: !!document.querySelector('form.form'),
+      rate: !!document.querySelector('.grid3'),
+    })`)
+    check(`${person.who}: Remittance shows the history`, ok, oneLine(await page.text('.kpis'), 110))
+    // Ghada sends the money and still cannot record it: D4 puts the rate in
+    // the accountant's hands, and the database refuses her either way.
+    check(`${person.who}: only the admin gets the form`,
+      view.form === (person.role === 'Admin'), `form ${view.form}`)
   }
 
   if (seen.nav.includes('/myearnings')) {

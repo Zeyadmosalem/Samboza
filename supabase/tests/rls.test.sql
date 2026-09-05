@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(70);
+select plan(79);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -54,6 +54,7 @@ insert into accounts (id, family_id, kind, name, system_key) values
   -- D14: Marwa's quarter is money the family HOLDS for her between Joe
   -- handing it over and Abdo paying it out. A liability, not income.
   ('cccc0000-0000-4000-8000-000000000006','aaaaaaaa-0000-4000-8000-000000000001','liability','Car share owed','car_share_payable'),
+  ('cccc0000-0000-4000-8000-000000000007','aaaaaaaa-0000-4000-8000-000000000001','income','Remittances','remittance_income'),
   -- The OTHER family's cash. Nothing in Samboza may ever post to it.
   ('cccc0000-0000-4000-8000-000000000004','aaaaaaaa-0000-4000-8000-000000000002','asset','Their cash','cash');
 
@@ -263,6 +264,14 @@ select throws_ok(
     values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000002',
             100, 'SAR', 12.9, 1290, current_date, 'bbbb0000-0000-4000-8000-000000000002')$$,
   '42501', null, 'Ghada cannot record a remittance');
+
+-- It is her money arriving and she still cannot record it: the rate is the
+-- accountant's to set (D4), and the two halves of the transaction are kept
+-- apart on purpose.
+select throws_ok(
+  $$select record_remittance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000002', 100000, 'SAR', 12.9, current_date)$$,
+  '42501', null, 'nor through record_remittance()');
 
 select throws_ok(
   $$insert into allowances (family_id, recipient_id, period, amount_egp, paid_on,
@@ -477,6 +486,54 @@ select is(tests.rows_in('select 1 from member_balances'), 1::bigint,
   'a member sees ONE row in member_balances — his own');
 
 select tests.be('11111111-1111-4111-8111-111111111111');
+
+-- =====================================================================
+-- 0014 — the remittance: what arrived, at the rate that was agreed.
+-- =====================================================================
+select lives_ok(
+  $$select record_remittance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000002', 100000, 'SAR', 12.9,
+      current_date, 'September visit')$$,
+  'the admin records 1,000 SAR at 12.9');
+
+-- The EGP figure is DERIVED, once, from the amount and the rate. Before 0014
+-- it arrived from the client and nothing compared the three to each other, so
+-- a row could say 1,000 SAR at 12.9 came to EGP 900 and be believed.
+select is(
+  (select amount_egp from remittances where currency = 'SAR'),
+  1290000::bigint, 'and the EGP figure follows from the amount and the rate');
+
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000001'),
+  1290000::bigint, 'the cash is in the family''s hands');
+
+-- The original amount is never overwritten (§3.7): the rate is part of the
+-- record, so the row still explains itself a year later.
+select is(
+  (select amount_original::bigint from remittances where currency = 'SAR'),
+  100000::bigint, 'and the original amount is kept exactly as it arrived');
+
+select throws_ok(
+  $$select record_remittance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000002', 5000, 'EGP', 12.9, current_date)$$,
+  'P0001', null, 'EGP cannot convert to EGP at anything but 1');
+
+select throws_ok(
+  $$select record_remittance('aaaaaaaa-0000-4000-8000-000000000001',
+      'bbbb0000-0000-4000-8000-000000000002', 5000, 'GBP', 60, current_date)$$,
+  'P0001', null, 'and only EGP, SAR and USD are accepted');
+
+-- Abdo types the rate by hand, so he will eventually type it wrong.
+select lives_ok(
+  $$select void_remittance((select id from remittances where currency = 'SAR'),
+                           'rate was 12.9, not 129')$$,
+  'a mistyped remittance is voided');
+
+select is(
+  (select balance::bigint from account_balances
+    where account_id = 'cccc0000-0000-4000-8000-000000000001'),
+  0::bigint, 'and its entry is reversed rather than deleted');
 
 -- =====================================================================
 -- Cross-tenant. The whole multi-family promise rests on these two.

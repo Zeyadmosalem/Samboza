@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type Family, type Person } from './supabase'
+import { setFamilyZone } from './data'
 
 /**
  * Authentication is PER PERSON; the family is the context you then work in.
@@ -128,6 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         family: r.family as Family,
       }))
       setMemberships(rows)
+      // Before any screen renders, so "today" means the same day to Abdo in
+      // Cairo and to Ghada in Saudi.
+      setFamilyZone(rows[0].family.timezone)
       if (!rows.some(r => r.family.id === familyId)) {
         setFamilyId(rows[0].family.id)
         localStorage.setItem('samboza-family', rows[0].family.id)

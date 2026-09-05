@@ -44,6 +44,8 @@ export interface Family {
   code: string
   name: string
   base_currency: string
+  /** Where this family's day starts. See setFamilyZone in data.ts. */
+  timezone: string | null
 }
 
 /** The public member code — derived, never stored. See plan §2.4. */

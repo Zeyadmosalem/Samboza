@@ -84,7 +84,12 @@ export function reporter() {
   }
 }
 
+/**
+ * The FAMILY's date, not this machine's and not UTC. The database runs on
+ * Africa/Cairo and refuses a date it has not reached, so a checker running at
+ * half past midnight on a laptop set to Cairo would ask it to accept tomorrow.
+ * Which is how this was found.
+ */
 export const dayString = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-export const monthStart = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d)
+export const monthStart = (d = new Date()) => dayString(d).slice(0, 7) + '-01'

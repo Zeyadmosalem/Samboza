@@ -145,7 +145,7 @@ check('Add Transaction: a member submits, and it lands pending',
 
 /* -------------------------------------------------------- Joe, the driver */
 {
-  const { data: day } = await admin.from('car_days').insert({
+  const { data: day, error: dayErr } = await admin.from('car_days').insert({
     family_id: fam.id, drive_date: TODAY, submitted_by: P.Joe.id,
     gross_egp: 90000, direct_egp: 15000, indirect_egp: 0, net_egp: 75000,
     driver_egp: 25000, family_egp: 37500, marwa_egp: 12500,
@@ -158,7 +158,7 @@ check('Add Transaction: a member submits, and it lands pending',
   ])
   const owed = days.data.filter(x => x.status === 'recorded').reduce((a, x) => a + x.family_egp, 0)
   check('Dashboard (driver): Joe sees his own days', !days.error && days.data.length >= 1,
-    `${days.data?.length} days · ${owed} owed to the family`)
+    dayErr ? 'seed failed: ' + dayErr.message : `${days.data?.length} days · ${owed} owed to the family`)
   check('Dashboard (driver): the ledger is EMPTY, not an error',
     !ledger.error && ledger.data.length === 0,
     ledger.error ? `errored: ${ledger.error.message}` : '0 rows and no error')
@@ -180,7 +180,7 @@ check('Add Transaction: a member submits, and it lands pending',
     loss.error?.message ?? `net ${lossRow?.net_egp}, shares ${lossRow?.driver_egp}/${lossRow?.family_egp}/${lossRow?.marwa_egp}`)
 
   await admin.from('car_expenses').delete().eq('car_day_id', loss.data ?? '')
-  await admin.from('car_days').delete().eq('id', day.id)
+  await admin.from('car_days').delete().eq('id', day?.id ?? '')
   await admin.from('car_days').delete().eq('id', loss.data ?? '')
 }
 
@@ -291,6 +291,51 @@ check('Add Transaction: a member submits, and it lands pending',
     again.data === false && !again.error, `returned ${JSON.stringify(again.data)}`)
 }
 
+/* -------------------------------------------------------- the remittance */
+{
+  const before = Number((await admin.from('account_balances').select('balance')
+    .eq('system_key', 'cash').single()).data.balance)
+
+  const rm = await abdo.rpc('record_remittance', {
+    p_family: fam.id, p_from_person: P.Ghada.id, p_amount_original: 100000,
+    p_currency: 'SAR', p_fx_rate: 12.9, p_received_on: TODAY,
+    p_visit_note: 'SCREEN CHECK visit', p_client_uuid: randomUUID(),
+  })
+  check('Remittance: the admin records 1,000 SAR at 12.9', !rm.error, rm.error?.message ?? '')
+
+  const { data: row } = await admin.from('remittances').select('*').eq('id', rm.data ?? '').single()
+  check('\u2026and the EGP figure is derived, not supplied',
+    row?.amount_egp === 1290000 && row.amount_original === 100000 && Number(row.fx_rate) === 12.9,
+    `${row?.amount_original} SAR \u00d7 ${row?.fx_rate} = ${row?.amount_egp}`)
+
+  const after = Number((await admin.from('account_balances').select('balance')
+    .eq('system_key', 'cash').single()).data.balance)
+  check('\u2026and the cash arrives', after - before === 1290000, `cash ${before} \u2192 ${after}`)
+
+  // She is the one who sends it, and still cannot record it: D4 puts the rate
+  // in the accountant's hands.
+  const hers = await ghada.rpc('record_remittance', {
+    p_family: fam.id, p_from_person: P.Ghada.id, p_amount_original: 100,
+    p_currency: 'SAR', p_fx_rate: 12.9, p_received_on: TODAY, p_client_uuid: randomUUID(),
+  })
+  check('\u2026which Ghada cannot do, even though it is her money',
+    hers.error?.code === '42501', hers.error?.message ?? '*** she recorded it ***')
+
+  const direct = await abdo.from('remittances').insert({
+    family_id: fam.id, from_person: P.Ghada.id, amount_original: 100,
+    currency: 'SAR', fx_rate: 12.9, amount_egp: 1, received_on: TODAY,
+    rate_set_by: P.Abdo.id,
+  })
+  check('\u2026and nobody inserts one directly with an EGP figure of their own',
+    !!direct.error, direct.error?.message?.slice(0, 55) ?? '*** accepted ***')
+
+  const undone = await abdo.rpc('void_remittance', { p_id: rm.data, p_reason: 'wrong rate' })
+  const back = Number((await admin.from('account_balances').select('balance')
+    .eq('system_key', 'cash').single()).data.balance)
+  check('\u2026a mistyped one is voided and its entry reversed',
+    undone.data === true && back === before, `cash back to ${back}`)
+}
+
 /* ------------------------------------------------------ History paginates */
 {
   const one = await abdo.from('ledger_feed').select('*').eq('family_id', fam.id)
@@ -304,6 +349,22 @@ check('Add Transaction: a member submits, and it lands pending',
 
 /* ------------------------------------------------------------- cleanup -- */
 await admin.from('member_expenses').delete().like('description', 'SCREEN CHECK%')
+{
+  const { data: rms } = await admin.from('remittances').select('id,journal_id')
+  for (const r of rms ?? []) {
+    await admin.from('remittances').delete().eq('id', r.id)
+    if (r.journal_id) {
+      await admin.from('entries').delete().eq('journal_id', r.journal_id)
+      await admin.from('journals').delete().eq('id', r.journal_id)
+    }
+  }
+  // The void posts a reversal of its own, which the loop above cannot see.
+  for (const j of (await admin.from('journals').select('id')
+                     .eq('source_table', 'remittances')).data ?? []) {
+    await admin.from('entries').delete().eq('journal_id', j.id)
+    await admin.from('journals').delete().eq('id', j.id)
+  }
+}
 {
   const { data: al } = await admin.from('allowances').select('id,journal_id')
   for (const a of al ?? []) {

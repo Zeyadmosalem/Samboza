@@ -219,7 +219,22 @@ Build in this order. Each step is demoable to the family on its own.
    - **Abdo is nudged at ten days** and told plainly at thirty. The Car screen
      asks for 60 days at most: a month of daily records is 30 rows, and
      fetching the whole table on every visit is how a free tier gets slow.
-5. **Remittances** — multi-currency in, rate stored with the record.
+5. **Remittances** — multi-currency in, rate stored with the record. **DONE.**
+   The EGP figure used to arrive from the client and nothing compared it to
+   the amount and the rate beside it, so a row could say 1,000 SAR at 12.9
+   came to EGP 900 and be believed. It is derived once, in SQL, from the two
+   numbers that ARE the record. Ghada reads the screen and cannot write to it:
+   D4 puts the rate in the accountant's hands, and it is stored with the row
+   so it still explains itself a year later. A mistyped rate is voided and
+   reversed, never edited. (0014)
+
+   And the one nobody would have found by reading: **the database was on UTC
+   and the family is not.** Between midnight and 3am Cairo time, recording
+   today came back "that day has not happened yet" — Joe finishing a late
+   shift, Abdo entering the shopping after everyone went to bed. The database
+   now runs on Africa/Cairo, the family carries its timezone as data, and the
+   app asks the family rather than the device, so Ghada's phone in Saudi
+   cannot record a day the rest of them have not reached. (0015)
 6. **Loans.**
 7. **Reports** — the four charts.
 8. **Offline + sync.** Client-generated UUIDs, and a submit that **reuses the
