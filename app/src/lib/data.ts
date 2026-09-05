@@ -843,3 +843,126 @@ export const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#
 const NEUTRAL = '#8a9490'
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
+
+/* ------------------------------------------------- her own book (§3.6) --- */
+
+/**
+ * Ghada's personal book. Deliberately NOT the family ledger: §3.6 says her
+ * salary, her rent in Riyadh and her groceries there are her own money and
+ * nobody else's business, and the policy on this table agrees — not even Abdo,
+ * the family's accountant, can read a row of it.
+ *
+ * It is also not a member sub-ledger. That one tracks an allowance the family
+ * GAVE, which is why it needs approving. Nothing here was ever family money,
+ * so nothing here is approved by anyone.
+ */
+export interface PersonalEntry {
+  id: string
+  person_id: string
+  direction: 'in' | 'out'
+  category: string
+  amount: number
+  currency: Currency
+  occurred_on: string
+  description: string | null
+  /** The one place the two books touch: a remittance is the largest line in
+   *  her month and income to the family. Same event, recorded twice, each
+   *  book keeping its own half. */
+  family_ref: string | null
+}
+
+/** Her list, not the family's — hence the p_ prefix and no `categories` row. */
+export const PERSONAL_IN = ['p_salary', 'p_bonus', 'p_other_in'] as const
+export const PERSONAL_OUT = [
+  'p_rent', 'p_food', 'p_transport', 'p_bills', 'p_health', 'p_sent_home', 'p_other_out',
+] as const
+
+export async function personalEntries(personId: string, opts: {
+  from?: string; to?: string; limit?: number
+} = {}) {
+  let q = supabase
+    .from('personal_entries')
+    .select('id,person_id,direction,category,amount,currency,occurred_on,description,family_ref')
+    .eq('person_id', personId)
+    .order('occurred_on', { ascending: false })
+    .limit(opts.limit ?? 200)
+  if (opts.from) q = q.gte('occurred_on', opts.from)
+  if (opts.to) q = q.lte('occurred_on', opts.to)
+  const { data, error } = await q
+  if (error) throw error
+  return (data ?? []) as PersonalEntry[]
+}
+
+export async function recordPersonal(args: {
+  familyId: string
+  personId: string
+  direction: 'in' | 'out'
+  category: string
+  amount: number
+  currency: Currency
+  occurredOn: string
+  description?: string | null
+  clientUuid: string
+}) {
+  return writeOrQueue('personal_entry', {
+    family_id: args.familyId,
+    person_id: args.personId,
+    direction: args.direction,
+    category: args.category,
+    amount: args.amount,
+    currency: args.currency,
+    occurred_on: args.occurredOn,
+    description: args.description || null,
+    client_uuid: args.clientUuid,
+  }, args.description || args.category)
+}
+
+export interface PersonalMonth {
+  month: string
+  /** Per currency, because they cannot be added. */
+  by: { currency: Currency; in: number; out: number }[]
+}
+
+/**
+ * Her months, each currency kept apart.
+ *
+ * A single "spent this month" figure would have to add SAR to EGP, and there
+ * is no rate in this book to do it with — the rates live on remittances,
+ * where the accountant sets them, and they describe a different transaction
+ * on a different day. Adding them anyway would produce a number that is not
+ * wrong by a little; it is not a quantity of anything.
+ */
+export function personalMonths(rows: PersonalEntry[]): PersonalMonth[] {
+  const months = new Map<string, Map<Currency, { in: number; out: number }>>()
+  for (const r of rows) {
+    const m = r.occurred_on.slice(0, 7) + '-01'
+    if (!months.has(m)) months.set(m, new Map())
+    const cur = months.get(m)!
+    if (!cur.has(r.currency)) cur.set(r.currency, { in: 0, out: 0 })
+    const slot = cur.get(r.currency)!
+    slot[r.direction] += r.amount
+  }
+  return [...months.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([month, by]) => ({
+      month,
+      by: [...by.entries()]
+        .sort((a, b) => b[1].out + b[1].in - (a[1].out + a[1].in))
+        .map(([currency, v]) => ({ currency, in: v.in, out: v.out })),
+    }))
+}
+
+/** What she sent home, from the family's side of the same events. She is a
+ *  viewer of the family books, so this is a read she is allowed. */
+export async function myRemittances(familyId: string, personId: string) {
+  const { data, error } = await supabase
+    .from('remittances')
+    .select('id,from_person,amount_original,currency,fx_rate,amount_egp,received_on,visit_note,voided_at,void_reason')
+    .eq('family_id', familyId)
+    .eq('from_person', personId)
+    .is('voided_at', null)
+    .order('received_on', { ascending: false })
+    .limit(60)
+  if (error) throw error
+  return (data ?? []) as Remittance[]
+}

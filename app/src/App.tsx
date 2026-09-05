@@ -17,9 +17,12 @@ import Remittance from './screens/Remittance'
 import Loans from './screens/Loans'
 import Reports from './screens/Reports'
 import SetPassword from './screens/SetPassword'
+import MyMoney from './screens/MyMoney'
+import MyMonth from './screens/MyMonth'
 
-/** Steps 1–7 of Phase 2 are real. Offline sync is what remains, plus the
- *  personal books §3.6 promises Ghada. */
+/** All eight steps of Phase 2, and the personal books of §3.6. What is left
+ *  in SCREENS without an entry here is admin housekeeping: People and
+ *  Settings. */
 const BUILT: Record<string, () => JSX.Element> = {
   dashboard: Dashboard,
   add: AddTransaction,
@@ -33,6 +36,8 @@ const BUILT: Record<string, () => JSX.Element> = {
   remittance: Remittance,
   loans: Loans,
   reports: Reports,
+  mymoney: MyMoney,
+  mymonth: MyMonth,
 }
 
 const SCREENS = [

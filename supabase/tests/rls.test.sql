@@ -15,7 +15,7 @@ begin;
 create schema if not exists tests;
 grant usage on schema tests to public;
 
-select plan(91);
+select plan(96);
 
 -- ------------------------------------------------------------ fixtures
 -- Two families, so cross-tenant leakage is testable rather than theoretical.
@@ -671,6 +671,45 @@ select is(
   0::bigint,
   'every view in public has security_invoker on'
 );
+
+-- =====================================================================
+-- 0017 — her book runs on her clock, not the family's.
+--
+-- Saudi is UTC+3 all year and Egypt is UTC+2 for the winter half of it, so
+-- for one hour after every Riyadh midnight the old CHECK refused the
+-- groceries she had just carried home: Cairo had not reached the day. These
+-- do not depend on the hour they run at, which the bug itself did.
+-- =====================================================================
+reset role;
+
+select is(person_today('bbbb0000-0000-4000-8000-000000000002'::uuid), (now() at time zone 'Africa/Cairo')::date,
+  'with no timezone of her own, her day is the family''s day');
+
+update people set timezone = 'Asia/Riyadh' where id = 'bbbb0000-0000-4000-8000-000000000002';
+
+select is(person_today('bbbb0000-0000-4000-8000-000000000002'::uuid), (now() at time zone 'Asia/Riyadh')::date,
+  'and once she has one, her day is Riyadh''s');
+
+select is(family_today('aaaaaaaa-0000-4000-8000-000000000001'::uuid), (now() at time zone 'Africa/Cairo')::date,
+  'while the family''s day is still Cairo''s — the ledger does not move with her');
+
+-- The check the trigger replaced, still enforced: a day that has not started
+-- anywhere she is.
+select throws_ok(
+  $$insert into personal_entries (family_id, person_id, direction, category,
+                                  amount, currency, occurred_on)
+    values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000002',
+            'out','p_food', 100, 'SAR', (now() at time zone 'Asia/Riyadh')::date + 1)$$,
+  '23514', null, 'she still cannot record a day that has not started where she is');
+
+-- 0010's guard, finally attached to the last table that has a person and a
+-- family and takes them straight from the client.
+select throws_ok(
+  $$insert into personal_entries (family_id, person_id, direction, category,
+                                  amount, currency, occurred_on)
+    values ('aaaaaaaa-0000-4000-8000-000000000001','bbbb0000-0000-4000-8000-000000000006',
+            'out','p_food', 100, 'SAR', current_date)$$,
+  '42501', null, 'a personal entry cannot name somebody from another family');
 
 select * from finish();
 rollback;

@@ -21,7 +21,7 @@ import { supabase } from './supabase'
 export type OutboxKind =
   | 'record_transaction' | 'member_expense' | 'record_car_day'
   | 'record_remittance' | 'pay_allowance' | 'confirm_handover'
-  | 'record_loan' | 'record_loan_payment'
+  | 'record_loan' | 'record_loan_payment' | 'personal_entry'
 
 export interface Pending {
   id: string
@@ -89,9 +89,18 @@ function isTransport(e: unknown): boolean {
   return /fetch|network|Failed to fetch|timeout|abort/i.test(err?.message ?? '') || !err?.code
 }
 
+/** The two that are plain table inserts rather than a function call. Both are
+ *  protected by a policy rather than by a definer, because neither has a
+ *  ledger invariant to keep — they are somebody's own list. */
+const TABLES: Partial<Record<OutboxKind, string>> = {
+  member_expense: 'member_expenses',
+  personal_entry: 'personal_entries',
+}
+
 async function send(p: Pending) {
-  if (p.kind === 'member_expense') {
-    const { error } = await supabase.from('member_expenses').insert(p.args as never)
+  const table = TABLES[p.kind]
+  if (table) {
+    const { error } = await supabase.from(table).insert(p.args as never)
     // A retry of a submission the server DID take comes back as a unique
     // violation on client_uuid. That is success arriving late, not a failure.
     if (error && error.code !== '23505') throw error

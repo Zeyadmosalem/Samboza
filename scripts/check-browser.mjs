@@ -14,7 +14,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { launch, signIn, type } from './lib/cdp.mjs'
-import { loadEnv, asAdmin, refuseIfLedgerHasData, reporter } from './lib/env.mjs'
+import { loadEnv, asAdmin, asPerson, refuseIfLedgerHasData, reporter } from './lib/env.mjs'
 import { EMAIL } from './lib/people.mjs'
 
 const APP = process.env.APP_URL ?? 'http://localhost:4173/'
@@ -229,6 +229,7 @@ for (const person of PEOPLE) {
 /* ------------------------------------------- end to end, through the form */
 console.log('\n=== recording real money, through the real form ===\n')
 const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
+const PERSONAL_MEMO = 'HER BOOK ' + randomUUID().slice(0, 8)
 
 {
   const page = await browser.page()
@@ -440,6 +441,57 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
   }
 }
 
+/* ------------ Ghada's own book: the one Abdo is not allowed to read ----- */
+{
+  const page = await browser.page()
+  await signIn(page, APP, EMAIL.ghada)
+  await page.click('a[href="/mymoney"]')
+  const form = await page.wait(`!!document.querySelector('#pb-amount')`)
+  check('Ghada reaches her own book', form, await page.text('.card .cardhead h2'))
+
+  // SAR, because she is paid in SAR and lives there. The default matters:
+  // an EGP default means retyping the currency every single day.
+  const currency = await page.ev(`document.querySelector('#pb-currency')?.value`)
+  check('…and it opens in the currency she is actually paid in', currency === 'SAR', currency)
+
+  await page.ev(type('#pb-amount', '1250'))
+  await page.ev(type('#pb-cat', 'p_rent', 'select'))
+  await page.ev(`document.querySelector('#pb-desc').focus(), true`)
+  await page.ev(type('#pb-desc', PERSONAL_MEMO))
+  await page.ev(`document.querySelector('form').requestSubmit()`)
+
+  const saved = await page.wait(`!!document.querySelector('.notice')`)
+  check('…records into it', saved, oneLine(await page.text('.notice'), 70))
+
+  const { data: mine } = await admin.from('personal_entries')
+    .select('amount,currency,category,direction').eq('description', PERSONAL_MEMO)
+  check('…and it is stored in SAR, as SAR',
+    mine?.length === 1 && mine[0].amount === 125000 && mine[0].currency === 'SAR' &&
+    mine[0].category === 'p_rent' && mine[0].direction === 'out',
+    JSON.stringify(mine?.[0] ?? null))
+
+  // Nothing in her book is family money, so nothing in it may reach the
+  // family ledger. This is the assertion the whole feature rests on.
+  const { data: leaked } = await admin.from('journals').select('id').eq('memo', PERSONAL_MEMO)
+  check('…and nothing about it reaches the family ledger', (leaked ?? []).length === 0,
+    `${(leaked ?? []).length} journals`)
+
+  await page.click('a[href="/mymonth"]')
+  const month = await page.wait(`!!document.querySelector('svg')`)
+  check('…and her month reads back', month, oneLine(await page.text('.card .cardhead h2'), 60))
+  await page.dispose()
+}
+
+/* Abdo is the family's accountant and not hers. He can read every other
+   table in this project; this is the one he cannot. */
+{
+  const abdoClient = await asPerson(env, EMAIL.abdo)
+  const { data, error } = await abdoClient.from('personal_entries').select('id')
+  check('Abdo cannot read a row of it — no error, no rows, which is how RLS refuses',
+    !error && (data ?? []).length === 0,
+    error ? error.message : `${(data ?? []).length} rows`)
+}
+
 /* ------------------------------------------------------------- cleanup -- */
 {
   const { data: days } = await admin.from('car_days').select('id,journal_id')
@@ -452,6 +504,7 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
     }
   }
 }
+await admin.from('personal_entries').delete().eq('description', PERSONAL_MEMO)
 await admin.from('member_expenses').delete().eq('description', MEMO)
 const { data: js } = await admin.from('journals').select('id').eq('memo', MEMO)
 for (const j of js ?? []) {
