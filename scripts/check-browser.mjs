@@ -168,6 +168,28 @@ for (const person of PEOPLE) {
       view.form === (person.role === 'Admin'), `form ${view.form}`)
   }
 
+  if (seen.nav.includes('/reports')) {
+    await page.click('a[href="/reports"]')
+    // Four charts and a table view. The table is not a nicety: three palette
+    // slots fall below 3:1 on a light surface and the rule says a contrast
+    // warning obliges visible labels or a table.
+    const ok = await page.wait(`document.querySelectorAll('.chart').length >= 2 ||
+      /Nothing recorded|مافيش حاجة متسجلة/.test(document.querySelector('.page')?.innerText ?? '')`)
+    const view = await page.ev(`({
+      charts: document.querySelectorAll('.chart').length,
+      table: [...document.querySelectorAll('.segbtn')].some(b => /Table|جدول/.test(b.textContent)),
+      overflow: [...document.querySelectorAll('.chart')].some(c => {
+        const box = c.getBoundingClientRect(), card = c.closest('.card').getBoundingClientRect();
+        return box.top < card.top - 1 || box.bottom > card.bottom + 1;
+      }),
+    })`)
+    check(`${person.who}: Reports renders`, ok, `${view.charts} charts`)
+    // The bug looking at it caught: a bar taller than the top tick escaped its
+    // card and landed on the subtitle.
+    check(`${person.who}: no chart escapes its card`, !view.overflow, `overflow ${view.overflow}`)
+    check(`${person.who}: a table view exists`, view.table, `table toggle ${view.table}`)
+  }
+
   if (seen.nav.includes('/loans')) {
     await page.click('a[href="/loans"]')
     const ok = await page.wait(

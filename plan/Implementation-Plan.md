@@ -245,7 +245,25 @@ Build in this order. Each step is demoable to the family on its own.
    outstanding is refused — an extra zero would leave the loan reading as
    though the family were owed money it never lent. Status and balance stay
    derived, as 0005 insisted. (0016)
-7. **Reports** — the four charts.
+7. **Reports** — the four charts. **DONE**, and drawn rather than imported:
+   the plan chose Victory for React-Native compatibility, and Capacitor
+   removed that constraint by shipping this same web bundle, so it is ~300
+   lines of SVG instead of 200KB of someone else's opinions.
+
+   - **The palette was wrong and the validator said so.** Gifts and Other both
+     used `#8a9490` — one hue for two categories, and a hue with almost no
+     chroma, sitting 3.5 ΔE from Medical under protanopia. A donut of the
+     family's spending had two identical slices and a third that a red-green
+     colourblind reader could not separate from them. The seven now pass every
+     check in both modes.
+   - **The donut caps at six.** Past six, neighbouring slices stop being
+     tellable apart and no palette rescues it, so the tail folds into one and
+     the table lists everything.
+   - **The table view is obliged, not offered.** Three light-mode slots fall
+     below 3:1 on white; that warning requires visible labels or a table.
+   - **Looking at it caught the bug reading it never would.** The tick scale
+     could stop below the largest value, so a tall bar was drawn with a
+     negative y, climbed out of its card and sat on top of the subtitle.
 8. **Offline + sync.** Client-generated UUIDs, and a submit that **reuses the
    same id on retry** — otherwise Joe on bad signal submits Tuesday twice.
 

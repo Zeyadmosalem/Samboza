@@ -87,14 +87,25 @@ const ACCOUNTS = [
   { key: 'loan_receivable',   kind: 'asset',  name: 'Loans owed to us' },
 ]
 
+/* Category colours are the data-viz palette's categorical slots, IN ORDER, and
+   the order is not decorative: the slots are stepped so that adjacent ones stay
+   apart for a colourblind reader. Gifts and Other both used to be #8a9490,
+   which is two problems at once — one hue for two categories, and a hue with
+   almost no chroma, so it reads as grey and sits 3.5 ΔE from Medical under
+   protanopia. A donut of the family's spending had two identical slices and a
+   third nobody with red-green colourblindness could tell from them.
+
+   Verified, not eyeballed: the seven now pass every check the validator makes
+   in both light and dark. Three of them fall below 3:1 against a white
+   surface, so charts using them carry direct labels and a table view. */
 const CATEGORIES = [
   { en: 'Allowance', ar: 'المصروف',   kind: 'expense', colour: '#2a78d6' },
   { en: 'Rent',      ar: 'الإيجار',   kind: 'expense', colour: '#eb6834' },
   { en: 'Food',      ar: 'الأكل',     kind: 'expense', colour: '#1baf7a' },
   { en: 'Education', ar: 'التعليم',   kind: 'expense', colour: '#eda100' },
   { en: 'Medical',   ar: 'العلاج',    kind: 'expense', colour: '#e87ba4' },
-  { en: 'Gifts',     ar: 'الهدايا',   kind: 'expense', colour: '#8a9490', needs_recipient: true },
-  { en: 'Other',     ar: 'أخرى',      kind: 'expense', colour: '#8a9490' },
+  { en: 'Gifts',     ar: 'الهدايا',   kind: 'expense', colour: '#008300', needs_recipient: true },
+  { en: 'Other',     ar: 'أخرى',      kind: 'expense', colour: '#4a3aa7' },
   // Income the family receives directly. Remittances and the car have their
   // own screens and their own accounts, so this is deliberately the only one:
   // without it the income side of Add Transaction is an empty dropdown, and

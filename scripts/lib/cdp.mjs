@@ -82,6 +82,9 @@ export async function launch(port = 9333) {
           return false
         },
         text: sel => ev(`document.querySelector(${JSON.stringify(sel)})?.innerText ?? null`),
+        /** A PNG of the full page, for looking at layout the way a reader does. */
+        screenshot: () => send('Page.captureScreenshot',
+          { format: 'png', captureBeyondViewport: true }, s),
         click: sel => ev(`document.querySelector(${JSON.stringify(sel)})?.click(), true`),
         dispose: () => send('Target.disposeBrowserContext', { browserContextId: ctx }),
       }

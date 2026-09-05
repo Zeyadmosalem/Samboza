@@ -15,9 +15,10 @@ import Car from './screens/Car'
 import MyEarnings from './screens/MyEarnings'
 import Remittance from './screens/Remittance'
 import Loans from './screens/Loans'
+import Reports from './screens/Reports'
 
-/** Steps 1–6 of Phase 2 are real. Reports and offline sync are what remain,
- *  plus the personal books §3.6 promises Ghada. */
+/** Steps 1–7 of Phase 2 are real. Offline sync is what remains, plus the
+ *  personal books §3.6 promises Ghada. */
 const BUILT: Record<string, () => JSX.Element> = {
   dashboard: Dashboard,
   add: AddTransaction,
@@ -30,6 +31,7 @@ const BUILT: Record<string, () => JSX.Element> = {
   myearnings: MyEarnings,
   remittance: Remittance,
   loans: Loans,
+  reports: Reports,
 }
 
 const SCREENS = [

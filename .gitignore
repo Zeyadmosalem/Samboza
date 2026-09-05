@@ -20,3 +20,11 @@ Thumbs.db
 
 # typescript incremental build cache
 *.tsbuildinfo
+
+# design screenshots — for looking at once, not for keeping
+scripts/_reports-*.png
+
+# supabase CLI scratch: project refs, versions, and the LOCAL stack secrets
+# that `supabase start` writes. GitHub refused a push over the last of those,
+# correctly — nothing under here belongs in a repository.
+supabase/.temp/

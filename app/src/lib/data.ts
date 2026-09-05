@@ -727,3 +727,118 @@ export async function voidLoanPayment(id: string, reason: string) {
   if (error) throw error
   return data as boolean
 }
+
+/* ---------------------------------------------------------------- reports */
+
+export interface MonthTotal { month: string; income: number; expense: number }
+export interface Slice { key: string; label: string; amount: number; colour: string }
+
+/** The last `months` month-starts, oldest first, in the family's own calendar. */
+export function lastMonths(months: number): string[] {
+  const [y, m] = today().split('-').map(Number)
+  const out: string[] = []
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(y, m - 1 - i, 1)
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`)
+  }
+  return out
+}
+
+/**
+ * ONE query feeds all four charts.
+ *
+ * Six months of a family's ledger is a few hundred rows, so aggregating in the
+ * browser is cheaper than four round trips and keeps every chart derived from
+ * exactly the same rows — a report where the bar chart and the donut disagree
+ * because they were fetched separately is worse than no report.
+ */
+export async function reportRows(familyId: string, months = 6) {
+  const from = lastMonths(months)[0]
+  const rows: LedgerRow[] = []
+  // Paged rather than one huge range: PostgREST caps a response, and a family
+  // that has been running this for a year should not silently lose the tail.
+  for (let page = 0; page < 20; page++) {
+    const batch = await ledgerFeed({ familyId, from, limit: 500, offset: page * 500 })
+    rows.push(...batch)
+    if (batch.length < 500) break
+  }
+  return rows
+}
+
+/** Income and expense per month. Both are EGP, so both share one axis. */
+export function byMonth(rows: LedgerRow[], months: string[]): MonthTotal[] {
+  return months.map(month => {
+    const inMonth = rows.filter(r => r.occurred_on.slice(0, 7) === month.slice(0, 7))
+    return {
+      month,
+      income: sum(inMonth.filter(r => r.account_kind === 'income').map(r => r.signed_amount)),
+      expense: -sum(inMonth.filter(r => r.account_kind === 'expense').map(r => r.signed_amount)),
+    }
+  })
+}
+
+/**
+ * Spending by category, biggest first, capped.
+ *
+ * A donut is a part-to-whole glance and stops working past six segments — past
+ * that, adjacent slices blur and no palette saves it. So the tail folds into
+ * one "Rest" slice and the full breakdown lives in the table beside it, which
+ * is also the relief the palette's contrast warning requires.
+ */
+export function byCategory(
+  rows: LedgerRow[], lang: 'en' | 'ar', restLabel: string, max = 6,
+): { slices: Slice[]; all: Slice[]; total: number } {
+  const totals = new Map<string, Slice>()
+  for (const r of rows) {
+    if (r.account_kind !== 'expense') continue
+    const key = r.category_id ?? 'uncategorised'
+    const label = (lang === 'ar' ? r.category_ar : r.category_en) ?? '—'
+    const cur = totals.get(key) ?? { key, label, amount: 0, colour: r.category_colour ?? NEUTRAL }
+    cur.amount += -r.signed_amount
+    totals.set(key, cur)
+  }
+  const all = [...totals.values()].filter(s => s.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+  const total = sum(all.map(s => s.amount))
+
+  if (all.length <= max) return { slices: all, all, total }
+  const head = all.slice(0, max - 1)
+  const rest = all.slice(max - 1)
+  return {
+    slices: [...head, {
+      key: 'rest', label: restLabel, colour: NEUTRAL,
+      amount: sum(rest.map(s => s.amount)),
+    }],
+    all, total,
+  }
+}
+
+/** What the family spent on each person. Attribution, not judgement. */
+export function byPerson(
+  rows: LedgerRow[], names: Map<string, string>, unattributed: string,
+): Slice[] {
+  const totals = new Map<string, number>()
+  for (const r of rows) {
+    if (r.account_kind !== 'expense') continue
+    const key = r.person_id ?? '—'
+    totals.set(key, (totals.get(key) ?? 0) + -r.signed_amount)
+  }
+  return [...totals.entries()]
+    .map(([key, amount]) => ({
+      key, amount, colour: SERIES[0],
+      label: key === '—' ? unattributed : names.get(key) ?? '—',
+    }))
+    .filter(s => s.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
+}
+
+/**
+ * The categorical slots, in the order the validator signed off. Never cycled:
+ * a ninth series folds into "Rest" rather than reusing slot 1, because a
+ * repeated hue is indistinguishable from the original under any test a reader
+ * can perform.
+ */
+export const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948']
+const NEUTRAL = '#8a9490'
+
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
