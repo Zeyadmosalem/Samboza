@@ -114,6 +114,30 @@ jobs:
           esac
           echo "password: ${#pass} characters"
 
+      # Five seconds that tell you which half is wrong.
+      #
+      # "password authentication failed for user postgres" can mean the
+      # password is wrong, or it can mean something between here and Postgres
+      # rewrote the username — the pooler strips the tenant, so the name in
+      # that message is never the name in the connection string. One plain
+      # psql, with no Supabase CLI and no Docker in the way, separates them:
+      # if this connects, the credentials are fine and the tooling is the
+      # problem; if it does not, nothing further is worth trying.
+      - name: Can these credentials connect at all
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if psql "$DB_URL" -Atc "select current_user || ' on ' || current_database()"; then
+            echo "connected"
+          else
+            echo "::error::These credentials cannot open a connection, so the dump never will."
+            echo "::error::The surest repair is to stop retyping it: Supabase -> Settings ->"
+            echo "::error::Database -> Reset database password, then copy the WHOLE Session"
+            echo "::error::pooler string it shows straight afterwards — it already has the new"
+            echo "::error::password in it, so nothing has to be pasted into the middle of it."
+            exit 1
+          fi
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
