@@ -137,6 +137,35 @@ const suite = readFileSync(TESTS, 'utf8')
            'every RLS change needs an assertion that fails before it and passes after')
 }
 
+/* 6 — nothing key-shaped is staged ---------------------------------------
+   `supabase start` writes the LOCAL stack's service_role key and JWT secret
+   into supabase/.temp, and a `git add -A` swept them into a commit. GitHub's
+   push protection refused it, which is the only reason that is a story about
+   a near miss rather than about a rotation. Those particular keys are the
+   public demo values every local stack uses, so nothing was at risk — but the
+   same `git add -A` would have taken the real ones just as happily. */
+{
+  let staged = []
+  try {
+    staged = execSync('git diff --cached --name-only', { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').map(s => s.trim()).filter(Boolean)
+  } catch { /* nothing staged */ }
+
+  const byName = staged.filter(f =>
+    /(^|\/)\.env($|\.)/i.test(f) || f.includes('supabase/.temp/') || /secrets?\//i.test(f))
+
+  const byContent = staged.filter(f => {
+    try {
+      return /SERVICE_ROLE_KEY\s*=\s*ey|JWT_SECRET\s*=\s*\S{16}/i.test(readFileSync(ROOT + f, 'utf8'))
+    } catch { return false }
+  })
+
+  const bad = [...new Set([...byName, ...byContent])]
+  bad.length === 0
+    ? pass('nothing key-shaped is staged', `${staged.length} file(s) staged`)
+    : fail('a staged file looks like it holds a secret', bad.join(', '))
+}
+
 console.log(problems
   ? `\n  ${problems} problem(s). Fix these before pushing — CI failing is an email to the family.\n`
   : '\n  clean\n')
