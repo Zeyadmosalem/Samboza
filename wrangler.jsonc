@@ -13,6 +13,9 @@
   // exist. "single-page-application" serves index.html with a 200 instead and
   // lets the router read the URL it was actually given.
   "name": "samboza",
+  // Not a credential — it is the identifier in every dashboard URL. It lives
+  // here so the deploy needs exactly one secret rather than two.
+  "account_id": "c71493a2ff8c7d8db11c332da0ba1d50",
   "compatibility_date": "2026-09-05",
   "assets": {
     "directory": "./app/dist",

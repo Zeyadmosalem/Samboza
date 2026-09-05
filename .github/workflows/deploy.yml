@@ -1,0 +1,99 @@
+# Build the app, then put the BUILT files on Cloudflare.
+#
+# The first deploy served app/index.html straight from the repository — the
+# source file, whose only script tag is src="/src/main.tsx". That file does not
+# exist on a server; it is a thing Vite reads at build time. So the page loaded,
+# was blank, and said nothing about why. The build had simply never run.
+#
+# Doing it here rather than through Cloudflare's own Git integration is not a
+# preference: it puts the build command in version control, where it can be
+# read, changed and reviewed, instead of in a dashboard field that nobody can
+# see from the repository.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'wrangler.jsonc'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        working-directory: app
+        run: npm ci
+
+      # Vite bakes these into the bundle at build time, so they have to be
+      # here rather than on the Worker. Both are public by design — the anon
+      # key ships in the bundle and row-level security is what protects the
+      # data, which is the whole reason the policies were written first.
+      - name: Build
+        working-directory: app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      # The exact failure that shipped the first time. A built index.html
+      # references a hashed bundle under assets/; if it still points at
+      # /src/main.tsx then what is about to be uploaded is the source file and
+      # the site will be blank.
+      - name: Refuse to deploy the source file
+        run: |
+          if grep -q '/src/main.tsx' app/dist/index.html; then
+            echo "::error::app/dist/index.html still points at /src/main.tsx — this is the unbuilt source."
+            exit 1
+          fi
+          if ! grep -q 'assets/index-.*\.js' app/dist/index.html; then
+            echo "::error::app/dist/index.html has no hashed bundle. The build did not produce one."
+            exit 1
+          fi
+          # Missing env vars do not fail the build; they fail on first load,
+          # in the browser, with a thrown error nobody sees. Cheaper to catch
+          # the empty string here.
+          if ! grep -rqs 'supabase.co' app/dist/assets/*.js; then
+            echo "::error::the bundle has no Supabase URL in it — SUPABASE_URL/SUPABASE_ANON_KEY are missing or empty."
+            exit 1
+          fi
+          echo "built: $(grep -o 'assets/index-[^\"]*\.js' app/dist/index.html | head -1)"
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4 deploy
+
+      - name: It answers, and on the routes that are not files
+        run: |
+          url="https://samboza.ncspark.workers.dev"
+          sleep 5
+          for path in "/" "/reset" "/sw.js" "/manifest.webmanifest"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url$path")
+            echo "  $path -> $code"
+            if [ "$code" != "200" ]; then
+              echo "::error::$path returned $code"
+              exit 1
+            fi
+          done
+          # /reset must be the app, not a 404 page with a 200 on it: it is
+          # where every password reset link lands.
+          if ! curl -s --max-time 20 "$url/reset" | grep -q 'assets/index-'; then
+            echo "::error::/reset did not serve the app shell"
+            exit 1
+          fi
