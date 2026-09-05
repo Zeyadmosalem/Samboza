@@ -81,6 +81,39 @@ jobs:
           esac
           echo "as user ${user%%.*}.<ref>"
 
+          # And the password, which is where this actually goes wrong.
+          #
+          # The pooler strips the tenant and connects upstream as `postgres`,
+          # so a bad password reports "password authentication failed for user
+          # postgres" — the same sentence a bad username produces, naming a
+          # username that is not the one in the string. Following that message
+          # leads to the wrong repair.
+          #
+          # Nothing here prints the password. It reports the shape only:
+          # whether it is there, whether it is still the dashboard's
+          # placeholder, and how long it is.
+          creds=${rest%@*}
+          pass=${creds#*:}
+          if [ -z "$pass" ]; then
+            echo "::error::The connection string has no password in it."
+            exit 1
+          fi
+          case "$pass" in
+            *'['*|*']'*|*YOUR-PASSWORD*)
+              echo "::error::The password is still the dashboard placeholder, [YOUR-PASSWORD]."
+              echo "::error::Supabase shows it that way and does not fill it in. Use the database"
+              echo "::error::password — Settings -> Database -> Reset database password if it is lost."
+              exit 1 ;;
+          esac
+          case "$pass" in
+            *@*|*/*|*'?'*|*'#'*|*' '*)
+              echo "::warning::The password contains a character that changes how a URL is read"
+              echo "::warning::(one of @ / ? # or a space). Percent-encode it: @ is %40, / is %2F,"
+              echo "::warning::? is %3F, # is %23, a space is %20."
+              ;;
+          esac
+          echo "password: ${#pass} characters"
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
