@@ -352,6 +352,93 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
   await page.dispose()
 }
 
+/* --------------------------- Joe in a basement, with no signal at all ---- */
+{
+  const page = await browser.page()
+  await signIn(page, APP, 'joe@samboza.family')
+  await page.click('a[href="/carday"]')
+  await page.wait(`!!document.querySelector('form.form input[inputmode=decimal]')`)
+
+  // Genuinely offline: this is what navigator.onLine reads and what every
+  // fetch hits, not a flag the page could choose to ignore.
+  await page.offline(true)
+  await page.wait(`navigator.onLine === false`)
+
+  // A date of its own. The section above already recorded today, and
+  // car_days is unique per family per day — so reusing today would have the
+  // server refuse this on reconnect, which is a different thing being tested.
+  const offlineDay = new Date()
+  offlineDay.setDate(offlineDay.getDate() - 9)
+  const iso = offlineDay.toISOString().slice(0, 10)
+  await page.ev(type('form.form input[type=date]', iso))
+  await page.ev(type('form.form input[inputmode=decimal]', '400'))
+  await page.ev(`document.querySelector('form.form').requestSubmit()`)
+  const kept = await page.wait(`!!document.querySelector('.donemark.waiting')`)
+  check('Joe records a day with no connection, and is told it is on the phone',
+    kept, oneLine(await page.text('.card.form'), 90))
+
+  const { count: duringOffline } = await admin.from('car_days')
+    .select('*', { count: 'exact', head: true }).eq('drive_date', iso)
+  check('…nothing reached the database yet', duringOffline === 0, `${duringOffline} rows for ${iso}`)
+
+  // He presses submit again, because nothing appeared to happen. This is the
+  // exact moment client_uuid was invented for.
+  await page.ev(`[...document.querySelectorAll('.btn')]
+    .find(b => /Record another|سجّل يوم/.test(b.textContent))?.click(), true`)
+  await page.wait(`!!document.querySelector('form.form input[inputmode=decimal]')`)
+  const queued = await page.ev(`JSON.parse(localStorage.getItem('samboza-outbox') || '[]').length`)
+  check('…and it is waiting in the outbox', queued === 1, `${queued} queued`)
+
+  // The signal comes back.
+  await page.offline(false)
+  await page.wait(`navigator.onLine === true`)
+  await page.ev(`window.dispatchEvent(new Event('online')), true`)
+
+  for (let i = 0; i < 40; i++) {
+    const { count } = await admin.from('car_days')
+      .select('*', { count: 'exact', head: true }).eq('drive_date', iso)
+    if (count === 1) break
+    await new Promise(r => setTimeout(r, 500))
+  }
+  const { count: after } = await admin.from('car_days')
+    .select('*', { count: 'exact', head: true }).eq('drive_date', iso)
+  check('…and when the signal returns it sends itself, exactly once',
+    after === 1, `${after} row(s) for ${iso} after reconnecting`)
+
+  const left = await page.ev(`JSON.parse(localStorage.getItem('samboza-outbox') || '[]').length`)
+  check('…leaving the outbox empty', left === 0, `${left} still queued`)
+
+  // And the part without which none of the above is reachable: the app has to
+  // LOAD with no signal. A queue on a page that will not open is nothing.
+  const sw = await page.wait(`navigator.serviceWorker?.controller !== null`, 8000)
+  await page.offline(true)
+  await page.go(APP)
+  // Chrome drops network emulation when a navigation commits, so the document
+  // fetch happened offline — which is the half that proves the cache works —
+  // and the page then came back online. Re-apply it before judging the rest.
+  await page.offline(true)
+  const loaded = await page.wait(`!!document.querySelector('.shell')`, 12000)
+  const stale = await page.ev(
+    `/Showing what this phone|ده آخر اللي الموبايل/.test(document.body.innerText)`)
+  check('…and the app still opens with no connection at all', sw && loaded,
+    sw ? (loaded ? 'shell served from cache' : 'the page did not render')
+       : 'no service worker took control')
+  // And says so, rather than presenting a figure from yesterday as today's.
+  check('…and says the figures are what it last knew', loaded && stale,
+    stale ? 'the stale banner is shown' : 'no banner — it looks current')
+  await page.offline(false)
+  await page.dispose()
+
+  for (const d of (await admin.from('car_days').select('id,journal_id')).data ?? []) {
+    await admin.from('car_expenses').delete().eq('car_day_id', d.id)
+    await admin.from('car_days').delete().eq('id', d.id)
+    if (d.journal_id) {
+      await admin.from('entries').delete().eq('journal_id', d.journal_id)
+      await admin.from('journals').delete().eq('id', d.journal_id)
+    }
+  }
+}
+
 /* ------------------------------------------------------------- cleanup -- */
 {
   const { data: days } = await admin.from('car_days').select('id,journal_id')

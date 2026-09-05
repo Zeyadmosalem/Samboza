@@ -72,7 +72,7 @@ function AdminForm() {
   const [memo, setMemo] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<Sent>(null)
   // Generated once per attempt and REUSED on retry: a submit that times out
   // and is pressed again must post once, not twice.
   const [clientUuid, setClientUuid] = useState(newClientUuid)
@@ -102,12 +102,11 @@ function AdminForm() {
 
     setBusy(true)
     try {
-      await recordTransaction({
+      setDone(await recordTransaction({
         familyId: family.id, kind, categoryId, amount: piastres,
         occurredOn: date, personId: personId || null, memo: memo || null,
         clientUuid,
-      })
-      setDone(true)
+      }))
     } catch (e) {
       setErr(serverMessage(e))
     } finally {
@@ -116,11 +115,11 @@ function AdminForm() {
   }
 
   function again() {
-    setDone(false); setAmount(''); setMemo(''); setPersonId('')
+    setDone(null); setAmount(''); setMemo(''); setPersonId('')
     setClientUuid(newClientUuid())   // a NEW transaction, so a new identity
   }
 
-  if (done) return <Done message={t('saved')} onAgain={again} />
+  if (done) return <Done sent={done} message={t('saved')} onAgain={again} />
 
   return (
     <form className="card form" onSubmit={save}>
@@ -203,7 +202,7 @@ function MemberForm() {
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<Sent>(null)
   const [clientUuid, setClientUuid] = useState(newClientUuid)
 
   const visible = (cats.data ?? []).filter((c: Category) => c.kind === 'expense')
@@ -218,11 +217,10 @@ function MemberForm() {
 
     setBusy(true)
     try {
-      await submitExpense({
+      setDone(await submitExpense({
         familyId: family.id, personId: person.id, categoryId,
         amount: piastres, occurredOn: date, description, clientUuid,
-      })
-      setDone(true)
+      }))
     } catch (e) {
       setErr(serverMessage(e))
     } finally {
@@ -231,11 +229,11 @@ function MemberForm() {
   }
 
   function again() {
-    setDone(false); setAmount(''); setDescription('')
+    setDone(null); setAmount(''); setDescription('')
     setClientUuid(newClientUuid())
   }
 
-  if (done) return <Done message={t('submitted')} onAgain={again} />
+  if (done) return <Done sent={done} message={t('submitted')} onAgain={again} />
 
   return (
     <form className="card form" onSubmit={save}>
@@ -284,12 +282,25 @@ function MemberForm() {
 
 /* --------------------------------------------------------------- done --- */
 
-function Done({ message, onAgain }: { message: string; onAgain: () => void }) {
+/**
+ * 'sent' and 'queued' are not the same news and must not read the same. A
+ * member told "sent to Abdo" when it is sitting on their phone will not
+ * mention it again, and neither will Abdo, because he never saw it.
+ */
+export type Sent = 'sent' | 'queued' | null
+
+function Done({ sent, message, onAgain }: {
+  sent: Sent; message: string; onAgain: () => void
+}) {
   const { t } = useT()
+  const queued = sent === 'queued'
   return (
     <div className="card form">
-      <div className="donemark">✓</div>
-      <h2 style={{ textAlign: 'center', marginTop: 12 }}>{message}</h2>
+      <div className={'donemark' + (queued ? ' waiting' : '')}>{queued ? '↑' : '✓'}</div>
+      <h2 style={{ textAlign: 'center', marginTop: 12 }}>
+        {queued ? t('ob_saved_here') : message}
+      </h2>
+      {queued && <p className="sub" style={{ textAlign: 'center' }}>{t('ob_will_send')}</p>}
       <button className="btn wide ghost" style={{ marginTop: 22 }} onClick={onAgain}>
         {t('add_another')}
       </button>

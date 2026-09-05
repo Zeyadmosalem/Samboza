@@ -40,7 +40,7 @@ export default function CarDay() {
   const [costs, setCosts] = useState<Draft[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+  const [done, setDone] = useState<'sent' | 'queued' | null>(null)
   const [clientUuid, setClientUuid] = useState(newClientUuid)
 
   const grossP = toPiastres(gross) ?? 0
@@ -73,15 +73,14 @@ export default function CarDay() {
 
     setBusy(true)
     try {
-      await recordCarDay({
+      setDone(await recordCarDay({
         familyId: family.id, driveDate: date, worked,
         gross: grossP,
         expenses: lines.map(c => ({
           label: c.label, class: c.cls, amount_egp: c.p, description: c.note || null,
         })),
         clientUuid,
-      })
-      setDone(true)
+      }))
     } catch (e) {
       const m = (e as { message?: string }).message ?? ''
       setErr(/duplicate key|one_live_per_day/i.test(m) ? 'cd_err_already' : m || 'err_load')
@@ -91,16 +90,20 @@ export default function CarDay() {
   }
 
   function again() {
-    setDone(false); setGross(''); setCosts([]); setWorked(true)
+    setDone(null); setGross(''); setCosts([]); setWorked(true)
     setDate(today())
     setClientUuid(newClientUuid())
   }
 
   if (done) {
+    const queued = done === 'queued'
     return (
       <div className="card form">
-        <div className="donemark">✓</div>
-        <h2 style={{ textAlign: 'center', marginTop: 12 }}>{t('cd_saved')}</h2>
+        <div className={'donemark' + (queued ? ' waiting' : '')}>{queued ? '↑' : '✓'}</div>
+        <h2 style={{ textAlign: 'center', marginTop: 12 }}>
+          {queued ? t('ob_saved_here') : t('cd_saved')}
+        </h2>
+        {queued && <p className="sub" style={{ textAlign: 'center' }}>{t('ob_will_send')}</p>}
         <button className="btn wide ghost" style={{ marginTop: 22 }} onClick={again}>
           {t('cd_another')}
         </button>

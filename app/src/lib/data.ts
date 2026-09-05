@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { writeOrQueue } from './outbox'
 
 /**
  * Every query the money screens make, in one place.
@@ -236,7 +237,7 @@ export async function recordTransaction(args: {
   memo?: string | null
   clientUuid: string
 }) {
-  const { data, error } = await supabase.rpc('record_transaction', {
+  return writeOrQueue('record_transaction', {
     p_family: args.familyId,
     p_kind: args.kind,
     p_category: args.categoryId,
@@ -245,9 +246,7 @@ export async function recordTransaction(args: {
     p_person: args.personId ?? null,
     p_memo: args.memo ?? null,
     p_client_uuid: args.clientUuid,
-  })
-  if (error) throw error
-  return data as string
+  }, args.memo || args.occurredOn)
 }
 
 /** A member's own submission. Lands `pending`; only Abdo moves it. */
@@ -260,7 +259,7 @@ export async function submitExpense(args: {
   description?: string | null
   clientUuid: string
 }) {
-  const { error } = await supabase.from('member_expenses').insert({
+  return writeOrQueue('member_expense', {
     family_id: args.familyId,
     person_id: args.personId,
     category_id: args.categoryId,
@@ -268,8 +267,7 @@ export async function submitExpense(args: {
     occurred_on: args.occurredOn,
     description: args.description || null,
     client_uuid: args.clientUuid,
-  })
-  if (error) throw error
+  }, args.description || args.occurredOn)
 }
 
 /**
@@ -444,6 +442,11 @@ export function splitPreview(net: number) {
   return { driver, family, marwa: (net - driver) - family }
 }
 
+/**
+ * The one that most needs the outbox. Joe is in the car, often underground or
+ * at the edge of a signal, and a day he cannot record is a day that does not
+ * get recorded at all.
+ */
 export async function recordCarDay(args: {
   familyId: string
   driveDate: string
@@ -452,16 +455,14 @@ export async function recordCarDay(args: {
   expenses?: CostLine[]
   clientUuid: string
 }) {
-  const { data, error } = await supabase.rpc('record_car_day', {
+  return writeOrQueue('record_car_day', {
     p_family: args.familyId,
     p_drive_date: args.driveDate,
     p_worked: args.worked,
     p_gross: args.worked ? (args.gross ?? 0) : 0,
     p_expenses: args.worked ? (args.expenses ?? []) : [],
     p_client_uuid: args.clientUuid,
-  })
-  if (error) throw error
-  return data as string
+  }, args.driveDate)
 }
 
 export async function voidCarDay(id: string, reason: string) {

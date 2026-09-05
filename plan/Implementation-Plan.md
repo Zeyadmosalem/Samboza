@@ -266,6 +266,29 @@ Build in this order. Each step is demoable to the family on its own.
      negative y, climbed out of its card and sat on top of the subtitle.
 8. **Offline + sync.** Client-generated UUIDs, and a submit that **reuses the
    same id on retry** — otherwise Joe on bad signal submits Tuesday twice.
+   **DONE.** The ids were there from the first migration; this is what finally
+   uses them for the thing they were for. Three parts, and each was necessary:
+
+   - **An outbox.** A write that cannot go out is kept and retried. The
+     distinction that makes it work rather than loop: a request that never
+     arrived is worth retrying forever, and one the server *refused* is not —
+     "that month has already been paid" will be refused identically at every
+     future attempt, so it is surfaced instead.
+   - **An offline shell**, its precache list generated from the real bundle at
+     build time. A hardcoded list rots on the next build and a stale worker
+     serves a bundle that no longer exists, silently, and only for the people
+     who already had the app open.
+   - **A remembered identity.** Without it the app opened offline, showed
+     "Loading…" for ten seconds while getSession retried a token refresh that
+     could not succeed, and then said the server could not check the account.
+     Joe never reached the form. The wait is now bounded by TIME rather than
+     by `navigator.onLine`, because a phone on wifi with no route out reports
+     itself online.
+
+   Proved by driving Chrome genuinely offline: record a day, nothing reaches
+   the database, it waits in the outbox, the signal returns, it sends itself
+   exactly once, the queue empties, and a reload with no connection still
+   opens the app — saying it is showing what the phone last knew.
 
 **Checkpoint after each:** the family uses it for a week on real numbers before
 you build the next one.

@@ -45,7 +45,10 @@ function Gate() {
   const { t } = useT()
 
   if (loading) return <div className="centred">{t('loading')}</div>
-  if (!session) return <Login />
+  // `person` without `session` means: offline, with a session on this device
+  // and a remembered identity. Sending them to the sign-in screen would be
+  // asking them to authenticate against a server they cannot reach.
+  if (!session && !person) return <Login />
 
   // The lookup FAILED — a connection problem, not a permissions one. Saying
   // "you are not attached to a family" here would be a false accusation, and

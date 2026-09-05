@@ -287,6 +287,17 @@ const en = {
   rp_unattributed: 'Nobody in particular',
   rp_nobody: 'Nothing has been recorded against a person yet.',
 
+  /* the outbox */
+  ob_saved_here: 'Saved on this phone',
+  ob_will_send: 'It goes out as soon as you have a signal. You can close the app.',
+  ob_waiting_one: 'waiting to send',
+  ob_waiting_many: 'waiting to send',
+  ob_offline: 'No connection. Anything you record is kept here and sent when you are back.',
+  ob_sending: 'Sending…',
+  ob_send_now: 'Send now',
+  ob_discard: 'Remove',
+  ob_stale: 'Showing what this phone last knew. Figures may have moved since.',
+
   /* history */
   h_source: 'Source',
   h_person: 'Person',
@@ -576,6 +587,16 @@ const ar: Record<Key, string> = {
   rp_by_person_sub: 'اللي اتصرف واتسجل باسم حد. توثيق، مش حكم.',
   rp_unattributed: 'مش محدد',
   rp_nobody: 'مافيش حاجة متسجلة باسم حد لسه.',
+
+  ob_saved_here: 'اتحفظ على الموبايل',
+  ob_will_send: 'هيتبعت أول ما يكون فيه إنترنت. تقدر تقفل التطبيق.',
+  ob_waiting_one: 'مستني الإرسال',
+  ob_waiting_many: 'مستنيين الإرسال',
+  ob_offline: 'مافيش اتصال. أي حاجة تسجّلها بتتحفظ هنا وبتتبعت أول ما ترجع.',
+  ob_sending: 'بيتبعت…',
+  ob_send_now: 'ابعت دلوقتي',
+  ob_discard: 'شيل',
+  ob_stale: 'ده آخر اللي الموبايل عرفه. الأرقام يمكن تكون اتغيرت.',
 
   h_source: 'المصدر',
   h_person: 'الشخص',

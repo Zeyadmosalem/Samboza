@@ -66,6 +66,7 @@ export async function launch(port = 9333) {
         .result.sessionId
       await send('Page.enable', {}, s)
       await send('Runtime.enable', {}, s)
+      await send('Network.enable', {}, s)
 
       const ev = async expr => {
         const r = await send('Runtime.evaluate',
@@ -86,6 +87,11 @@ export async function launch(port = 9333) {
         screenshot: () => send('Page.captureScreenshot',
           { format: 'png', captureBeyondViewport: true }, s),
         click: sel => ev(`document.querySelector(${JSON.stringify(sel)})?.click(), true`),
+        /** Really offline, not a flag the page can ignore: this is what
+         *  navigator.onLine reads and what every fetch hits. */
+        offline: (yes) => send('Network.emulateNetworkConditions', {
+          offline: yes, latency: 0, downloadThroughput: -1, uploadThroughput: -1,
+        }, s),
         dispose: () => send('Target.disposeBrowserContext', { browserContextId: ctx }),
       }
     },

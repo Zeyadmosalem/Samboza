@@ -17,6 +17,29 @@ import { setFamilyZone } from './data'
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const SIGNED_IN_AT = 'samboza-signed-in-at'
 
+/**
+ * WHO YOU WERE, LAST TIME THIS WORKED.
+ *
+ * Without it the app opens offline, renders "Loading…", and then tells Joe
+ * the server cannot check his account — so he cannot reach the form, and
+ * "works offline for entry" is a sentence in a plan rather than a thing that
+ * happens. The shell caches, the outbox holds his day; this is what lets him
+ * get to the screen that fills it.
+ *
+ * IT GRANTS NOTHING. This is a name and a role used to draw a navigation bar.
+ * Every query still carries his real token and still meets the policies, so a
+ * stale "admin" in localStorage buys exactly what an honest one does: the
+ * database decides, and it has never been asked to trust this.
+ */
+const CACHED_ME = 'samboza-me'
+/** Where supabase-js keeps the session. Read directly only to answer "is
+ *  anybody signed in on this device", which it can do without a network. */
+const AUTH_KEY = 'samboza-auth'
+
+function readCached(): { person: Person; family: Family }[] {
+  try { return JSON.parse(localStorage.getItem(CACHED_ME) ?? '[]') } catch { return [] }
+}
+
 interface AuthState {
   loading: boolean
   session: Session | null
@@ -31,6 +54,9 @@ interface AuthState {
    * accuses the family of a permissions problem they do not have.
    */
   membershipError: boolean
+  /** True when the memberships came from the last successful load rather than
+   *  from the server. The app works; it just could not check. */
+  stale: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   chooseFamily: (familyId: string) => void
@@ -45,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [memberships, setMemberships] = useState<AuthState['memberships']>([])
   const [membershipError, setMembershipError] = useState(false)
+  /** Showing what we last knew, because the server could not be reached. */
+  const [stale, setStale] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [familyId, setFamilyId] = useState<string | null>(
     () => localStorage.getItem('samboza-family')
@@ -73,6 +101,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /* ---- session ------------------------------------------------------- */
   useEffect(() => {
+    /*
+     * OFFLINE, SHOW THE APP NOW.
+     *
+     * getSession() offline can spend ten seconds retrying a token refresh
+     * that cannot possibly succeed, and until it answers the app is a
+     * spinner. Joe in a basement car park does not wait ten seconds; he
+     * decides the app is broken and writes the day on his hand.
+     *
+     * So if this device has a session and remembers who it belongs to, render
+     * immediately and let getSession catch up whenever it likes. The identity
+     * is only used to draw the screens — every query still carries the real
+     * token and still meets the policies.
+     */
+    if (!navigator.onLine && localStorage.getItem(AUTH_KEY)) {
+      const rows = readCached()
+      if (rows.length) {
+        setMemberships(rows)
+        setFamilyZone(rows[0].family.timezone)
+        setStale(true)
+        setLoading(false)
+      }
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       if (!data.session) setLoading(false)
@@ -88,11 +139,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  /*
+   * WAITED LONG ENOUGH.
+   *
+   * navigator.onLine is not the whole story: a phone on hotel wifi with no
+   * route out reports true, and getSession can then spend ten seconds
+   * retrying a token refresh that cannot succeed. Either way the app is a
+   * spinner, and a spinner is what makes somebody decide it is broken.
+   *
+   * So the rule is about time rather than about connectivity. If this device
+   * has a session and remembers who it belongs to, and the network has not
+   * answered in two and a half seconds, show the app and say the figures are
+   * what it last knew. When the real answer arrives it replaces this.
+   */
+  useEffect(() => {
+    if (!loading) return
+    const t = setTimeout(() => {
+      const rows = readCached()
+      if (!localStorage.getItem(AUTH_KEY) || !rows.length) return
+      setMemberships(rows)
+      setFamilyZone(rows[0].family.timezone)
+      setStale(true)
+      setLoading(false)
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [loading])
+
   /* ---- who am I, and where ------------------------------------------- */
   useEffect(() => {
     if (!session) return
     let cancelled = false
+
+    /** Fall back to the last good answer. Returns false if there isn't one. */
+    const useCached = () => {
+      const rows = readCached()
+      if (!rows.length) return false
+      setMemberships(rows)
+      setFamilyZone(rows[0].family.timezone)
+      setStale(true)
+      setMembershipError(false)
+      setLoading(false)
+      return true
+    }
+
     ;(async () => {
+      // With no connection there is nothing to ask, and asking anyway leaves
+      // the app on a spinner for as long as fetch takes to give up — which is
+      // how "works offline" turns into a loading screen in a car park.
+      if (!navigator.onLine && useCached()) return
+
       const { data, error } = await supabase
         .from('people')
         // The relationship is NAMED, and must stay named. There are now two
@@ -111,12 +206,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // a dropped connection is not a revoked account, and telling someone
         // they have been removed from their own family because the wifi went
         // is the kind of message that gets a phone call.
+        if (useCached()) return
         setMembershipError(true)
         setMemberships([])
         setLoading(false)
         return
       }
       setMembershipError(false)
+      setStale(false)
       if (!data?.length) {
         // Authenticated but not a member of anything — a real state, not a
         // crash. Someone was deactivated, or an account exists with no person.
@@ -129,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         family: r.family as Family,
       }))
       setMemberships(rows)
+      try { localStorage.setItem(CACHED_ME, JSON.stringify(rows)) } catch { /* private mode */ }
       // Before any screen renders, so "today" means the same day to Abdo in
       // Cairo and to Ghada in Saudi.
       setFamilyZone(rows[0].family.timezone)
@@ -150,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     family: current?.family ?? null,
     memberships,
     membershipError,
+    stale,
     reload() {
       setLoading(true)
       setMembershipError(false)
@@ -170,6 +269,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async signOut() {
       localStorage.removeItem(SIGNED_IN_AT)
+      // Forget the cached identity too. It grants nothing, but a name and a
+      // family sitting in a shared laptop's storage after someone signs out
+      // is still theirs and not the next person's to see.
+      localStorage.removeItem(CACHED_ME)
       await supabase.auth.signOut()
     },
     chooseFamily(id) {
