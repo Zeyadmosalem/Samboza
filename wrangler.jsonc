@@ -12,6 +12,12 @@
   // link, which lands on exactly that path, tells the person the page does not
   // exist. "single-page-application" serves index.html with a 200 instead and
   // lets the router read the URL it was actually given.
+  //
+  // This is also why there is no app/public/_redirects. That file is how Pages
+  // is told the same thing, and Workers rejects its one rule outright — it
+  // reads `/* /index.html 200` as a redirect that would strip /index and match
+  // itself forever, and refuses the whole deploy. One hosting model, one
+  // place: here.
   "name": "samboza",
   // Not a credential — it is the identifier in every dashboard URL. It lives
   // here so the deploy needs exactly one secret rather than two.
