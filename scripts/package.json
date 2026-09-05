@@ -11,7 +11,8 @@
     "check:guards": "node check-guards.mjs",
     "check:screens": "node check-screens.mjs",
     "check:browser": "node check-browser.mjs",
-    "check": "node check-guards.mjs && node check-screens.mjs && node check-car.mjs && node check-browser.mjs",
-    "check:car": "node check-car.mjs"
+    "check": "node check-sql.mjs && node check-guards.mjs && node check-screens.mjs && node check-car.mjs && node check-browser.mjs",
+    "check:car": "node check-car.mjs",
+    "check:sql": "node check-sql.mjs"
   }
 }

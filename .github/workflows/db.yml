@@ -14,6 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Ten seconds of static checks before two minutes of containers. A plan
+      # count that does not match its assertions is a failed build either way;
+      # failing it here says so immediately and says why.
+      - name: Static checks
+        run: node scripts/check-sql.mjs
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
