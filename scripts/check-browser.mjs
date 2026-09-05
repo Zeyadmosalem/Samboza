@@ -15,6 +15,7 @@
 import { randomUUID } from 'node:crypto'
 import { launch, signIn, type } from './lib/cdp.mjs'
 import { loadEnv, asAdmin, refuseIfLedgerHasData, reporter } from './lib/env.mjs'
+import { EMAIL } from './lib/people.mjs'
 
 const APP = process.env.APP_URL ?? 'http://localhost:4173/'
 const env = loadEnv()
@@ -39,11 +40,11 @@ const oneLine = (text, max = 120) =>
 const PEOPLE = [
   // Five on the family dashboard since 0014: the plan asks for "days since
   // last remittance" by name, because income here is lumpy and tied to visits.
-  { email: 'abdo@samboza.family',  who: 'Abdo',  role: 'Admin',  kpis: 5 },
-  { email: 'ghada@samboza.family', who: 'Ghada', role: 'Viewer', kpis: 5 },
-  { email: 'zeyad@samboza.family', who: 'Zeyad', role: 'Member', kpis: 3 },
-  { email: 'rewan@samboza.family', who: 'Rewan', role: 'Member', kpis: 3 },
-  { email: 'joe@samboza.family',   who: 'Joe',   role: 'Driver', kpis: 4 },
+  { email: EMAIL.abdo,  who: 'Abdo',  role: 'Admin',  kpis: 5 },
+  { email: EMAIL.ghada, who: 'Ghada', role: 'Viewer', kpis: 5 },
+  { email: EMAIL.zeyad, who: 'Zeyad', role: 'Member', kpis: 3 },
+  { email: EMAIL.rewan, who: 'Rewan', role: 'Member', kpis: 3 },
+  { email: EMAIL.joe,   who: 'Joe',   role: 'Driver', kpis: 4 },
 ]
 
 console.log('\n=== the screens, one clean browser context per person ===\n')
@@ -231,7 +232,7 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
 
 {
   const page = await browser.page()
-  await signIn(page, APP, 'abdo@samboza.family')
+  await signIn(page, APP, EMAIL.abdo)
   await page.click('a[href="/add"]')
   await page.wait(`document.querySelectorAll('form.form select.input')[0]?.options.length > 1`)
 
@@ -267,7 +268,7 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
 
 {
   const page = await browser.page()
-  await signIn(page, APP, 'zeyad@samboza.family')
+  await signIn(page, APP, EMAIL.zeyad)
   await page.click('a[href="/add"]')
   await page.wait(`document.querySelectorAll('form.form select.input')[0]?.options.length > 1`)
 
@@ -304,7 +305,7 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
 /* ------------------------------- Joe records a losing day, Abdo settles it */
 {
   const page = await browser.page()
-  await signIn(page, APP, 'joe@samboza.family')
+  await signIn(page, APP, EMAIL.joe)
   await page.click('a[href="/carday"]')
   await page.wait(`!!document.querySelector('form.form input[inputmode=decimal]')`)
 
@@ -355,7 +356,7 @@ const MEMO = 'BROWSER CHECK ' + randomUUID().slice(0, 8)
 /* --------------------------- Joe in a basement, with no signal at all ---- */
 {
   const page = await browser.page()
-  await signIn(page, APP, 'joe@samboza.family')
+  await signIn(page, APP, EMAIL.joe)
   await page.click('a[href="/carday"]')
   await page.wait(`!!document.querySelector('form.form input[inputmode=decimal]')`)
 

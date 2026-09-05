@@ -27,6 +27,7 @@ import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { EMAIL } from './lib/people.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -54,11 +55,11 @@ const db = createClient(URL, KEY, { auth: { autoRefreshToken: false, persistSess
 const FAMILY = { code: 'SMBZ-7420', name: 'Samboza', base_currency: 'EGP' }
 
 const PEOPLE = [
-  { no: 1, name: 'Ghada', rel: 'mother',          role: 'viewer', email: 'ghada@samboza.family' },
-  { no: 2, name: 'Abdo',  rel: 'brother',         role: 'admin',  email: 'abdo@samboza.family'  },
-  { no: 3, name: 'Zeyad', rel: 'son',             role: 'member', email: 'zeyad@samboza.family' },
-  { no: 4, name: 'Rewan', rel: 'daughter',        role: 'member', email: 'rewan@samboza.family' },
-  { no: 9, name: 'Joe',   rel: 'uncle_maternal',  role: 'driver', email: 'joe@samboza.family'   },
+  { no: 1, name: 'Ghada', rel: 'mother',          role: 'viewer', email: EMAIL.ghada },
+  { no: 2, name: 'Abdo',  rel: 'brother',         role: 'admin',  email: EMAIL.abdo  },
+  { no: 3, name: 'Zeyad', rel: 'son',             role: 'member', email: EMAIL.zeyad },
+  { no: 4, name: 'Rewan', rel: 'daughter',        role: 'member', email: EMAIL.rewan },
+  { no: 9, name: 'Joe',   rel: 'uncle_maternal',  role: 'driver', email: EMAIL.joe   },
   // Beneficiaries: no login, no role. They appear in records and receive
   // money; they can be promoted to users later without rewriting history.
   { no: 5, name: 'Mona',        rel: 'aunt_maternal' },

@@ -28,3 +28,6 @@ scripts/_reports-*.png
 # that `supabase start` writes. GitHub refused a push over the last of those,
 # correctly — nothing under here belongs in a repository.
 supabase/.temp/
+
+# real email addresses + the shared password, until people set their own
+scripts/people.local.json

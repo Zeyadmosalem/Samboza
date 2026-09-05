@@ -19,13 +19,14 @@ import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { launch, signIn } from './lib/cdp.mjs'
 import { loadEnv, asAdmin, asPerson, refuseIfLedgerHasData, dayString } from './lib/env.mjs'
+import { EMAIL } from './lib/people.mjs'
 
 const APP = 'http://localhost:4173/'
 const env = loadEnv()
 const admin = asAdmin(env)
 await refuseIfLedgerHasData(admin)
 
-const abdo = await asPerson(env, 'abdo@samboza.family')
+const abdo = await asPerson(env, EMAIL.abdo)
 const { data: fam } = await abdo.from('families').select('id').single()
 const { data: cats } = await abdo.from('categories').select('id,name_en,kind,needs_recipient')
 const { data: ppl } = await abdo.from('people').select('id,display_name')
@@ -72,7 +73,7 @@ console.log(`seeded ${PLAN.length} entries + 3 remittances`)
 
 const browser = await launch(9350)
 const page = await browser.page()
-await signIn(page, APP, 'abdo@samboza.family')
+await signIn(page, APP, EMAIL.abdo)
 await page.click('a[href="/reports"]')
 await page.wait(`document.querySelectorAll('.chart').length >= 2`)
 await new Promise(r => setTimeout(r, 1200))

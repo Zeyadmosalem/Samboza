@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto'
 import {
   loadEnv, asAdmin, asPerson, refuseIfLedgerHasData, reporter, dayString, monthStart,
 } from './lib/env.mjs'
+import { EMAIL } from './lib/people.mjs'
 
 const env = loadEnv()
 const admin = asAdmin(env)
@@ -23,10 +24,10 @@ const { check, finish } = reporter()
 const TODAY = dayString()
 const MONTH = monthStart()
 
-const abdo = await asPerson(env, 'abdo@samboza.family')
-const ghada = await asPerson(env, 'ghada@samboza.family')
-const zeyad = await asPerson(env, 'zeyad@samboza.family')
-const joe = await asPerson(env, 'joe@samboza.family')
+const abdo = await asPerson(env, EMAIL.abdo)
+const ghada = await asPerson(env, EMAIL.ghada)
+const zeyad = await asPerson(env, EMAIL.zeyad)
+const joe = await asPerson(env, EMAIL.joe)
 
 const { data: fam } = await abdo.from('families').select('id').single()
 const { data: cats } = await abdo.from('categories').select('id,name_en,kind,needs_recipient')

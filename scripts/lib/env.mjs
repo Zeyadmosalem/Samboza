@@ -2,6 +2,7 @@
    Loads .env WITHOUT printing anything from it. Nothing in here logs a key. */
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
+import { PASSWORD } from './people.mjs'
 
 const ROOT = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 
@@ -27,7 +28,7 @@ export const asAdmin = ({ url, service }) =>
   createClient(url, service, { auth: { persistSession: false } })
 
 /** A real person, holding the same public key the browser holds. */
-export async function asPerson({ url, anon }, email, password = 'Samboza2026!') {
+export async function asPerson({ url, anon }, email, password = PASSWORD) {
   const c = createClient(url, anon, { auth: { persistSession: false } })
   const { error } = await c.auth.signInWithPassword({ email, password })
   if (error) throw new Error(`${email}: ${error.message}`)
