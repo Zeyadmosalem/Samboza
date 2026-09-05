@@ -172,8 +172,15 @@ jobs:
 
           # The tables the family's money actually lives in. A schema dump that
           # came back without `entries` is not a backup of this application.
-          for t in accounts journals entries people families car_days member_expenses remittances loans; do
-            if ! grep -q "CREATE TABLE .*\.$t " backup/schema.sql; then
+          #
+          # The identifiers are quoted — the dump says CREATE TABLE IF NOT
+          # EXISTS "public"."entries" — so an unquoted pattern matches nothing
+          # and reports all nine tables missing from a perfectly good 111KB
+          # dump. Which is exactly what it did, and is the reason this asserts
+          # against a real dump rather than against what pg_dump is assumed
+          # to write.
+          for t in accounts journals entries people families car_days member_expenses remittances loans personal_entries; do
+            if ! grep -qE "CREATE TABLE .*\"$t\"" backup/schema.sql; then
               echo "::error::schema.sql has no table $t"
               fail=1
             fi
