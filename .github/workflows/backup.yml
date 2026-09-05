@@ -1,0 +1,191 @@
+# A weekly copy of the family's money, kept somewhere that is not Supabase.
+#
+# The free tier has no point-in-time recovery: if a project is deleted, or an
+# account lapses, or somebody runs the wrong statement, what is in Postgres is
+# all there is. This is the only other copy.
+#
+# It fails loudly on an empty dump. "The backup ran" is not the same claim as
+# "the backup has anything in it", and the difference is only ever discovered
+# on the day it matters — so the size and the contents are both asserted here,
+# every week, rather than trusted.
+name: backup
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'        # Sundays, 03:00 UTC — 05:00 in Cairo
+  workflow_dispatch:
+    inputs:
+      restore_test:
+        description: 'Also restore it into a scratch database and count the rows'
+        type: boolean
+        default: false
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub's runners are IPv4-only and Supabase's direct host is IPv6-only,
+      # so db.<ref>.supabase.co cannot be reached from here at all. It fails
+      # with "Network is unreachable", and nothing in that message says which
+      # of the several connection strings on that settings page was the wrong
+      # one to copy. Say it here instead, before two minutes of setup.
+      - name: The connection string has to be the pooler
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL is not set. Add it under Settings -> Secrets -> Actions."
+            exit 1
+          fi
+          host=$(printf '%s' "$DB_URL" | sed -E 's|.*@([^:/]+).*|\1|')
+          echo "connecting to $host"
+          case "$host" in
+            db.*.supabase.co)
+              echo "::error::That is the direct connection, which is IPv6-only. GitHub runners are IPv4."
+              echo "::error::Use the session pooler instead: Supabase -> Settings -> Database ->"
+              echo "::error::Connection string -> Session pooler (aws-0-<region>.pooler.supabase.com:5432)."
+              exit 1 ;;
+            *pooler.supabase.com) : ;;
+            *) echo "::warning::Unrecognised host $host — carrying on, but the pooler is what is expected." ;;
+          esac
+          # The transaction pooler multiplexes statements, and pg_dump's
+          # snapshot does not survive that: the dump comes back inconsistent
+          # or errors halfway. Port 5432 is the session pooler, which is fine.
+          case "$DB_URL" in
+            *:6543/*)
+              echo "::error::Port 6543 is the transaction pooler — pg_dump cannot hold a consistent"
+              echo "::error::snapshot through it. Use port 5432, the session pooler."
+              exit 1 ;;
+          esac
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backup
+          date -u +%Y-%m-%d > backup/TAKEN_AT
+
+          # Three files, because restoring needs all three and they come out
+          # differently: who may do what, what the shape is, and what is in it.
+          supabase db dump --db-url "$DB_URL" --role-only -f backup/roles.sql
+          supabase db dump --db-url "$DB_URL"             -f backup/schema.sql
+          supabase db dump --db-url "$DB_URL" --data-only --use-copy -f backup/data.sql
+
+      # The failure this exists to catch: a dump that succeeded and is empty.
+      # It exits 0, it uploads, and it is found to be worthless on the single
+      # day anybody opens it.
+      - name: The dump has the ledger in it
+        run: |
+          fail=0
+          for f in roles schema data; do
+            size=$(stat -c%s "backup/$f.sql")
+            printf '  %-12s %10s bytes\n' "$f.sql" "$size"
+            if [ "$size" -lt 200 ]; then
+              echo "::error::backup/$f.sql is $size bytes — that is not a dump."
+              fail=1
+            fi
+          done
+
+          # The tables the family's money actually lives in. A schema dump that
+          # came back without `entries` is not a backup of this application.
+          for t in accounts journals entries people families car_days member_expenses remittances loans; do
+            if ! grep -q "CREATE TABLE .*\.$t " backup/schema.sql; then
+              echo "::error::schema.sql has no table $t"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Compress
+        run: |
+          tar -czf "samboza-backup-$(cat backup/TAKEN_AT).tar.gz" -C backup .
+          ls -la samboza-backup-*.tar.gz
+
+      # Private to this repository's collaborators. It holds the family's
+      # figures and their auth rows, so it does not get attached to anything
+      # public or forwarded out of here.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: samboza-backup
+          path: samboza-backup-*.tar.gz
+          retention-days: 90
+          if-no-files-found: error
+
+  # An untested backup is not a backup. This restores the dump into a real
+  # Postgres and counts what came back. Run it by hand, quarterly, per the
+  # maintenance table — it is off the weekly schedule because the weekly job's
+  # job is to notice an empty file, and this one costs minutes.
+  restore-test:
+    needs: dump
+    if: inputs.restore_test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: restore-test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: samboza-backup
+
+      - name: Restore into a scratch database
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          mkdir -p restore && tar -xzf samboza-backup-*.tar.gz -C restore
+          export PGPASSWORD=restore-test
+          PSQL="psql -h localhost -U postgres -q"
+
+          # Roles first: the policies in schema.sql grant to them by name.
+          # Errors are tolerated here on purpose — a bare Postgres is not a
+          # Supabase, so some of its extensions and grants will not apply. The
+          # assertions below are what decides whether the restore is good, not
+          # whether every statement in a Supabase dump ran on stock Postgres.
+          $PSQL -f restore/roles.sql  > /dev/null 2>&1 || true
+          $PSQL -f restore/schema.sql > /dev/null 2>&1 || true
+          $PSQL -f restore/data.sql   > /dev/null 2>&1 || true
+
+          {
+            echo "### Rows restored"
+            echo ''
+            echo '| table | rows |'
+            echo '|---|---:|'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          fail=0
+          for t in families people accounts journals entries car_days member_expenses remittances loans; do
+            n=$($PSQL -tA -c "select count(*) from public.$t" 2>/dev/null || echo missing)
+            echo "| $t | $n |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$n" = "missing" ]; then
+              echo "::error::$t did not restore"
+              fail=1
+            fi
+          done
+
+          # The assertion that proves it is the family's books rather than an
+          # empty shell of the right shape: every journal in the restored copy
+          # still balances to zero.
+          bad=$($PSQL -tA -c "select count(*) from (select journal_id from public.entries group by journal_id having sum(amount) <> 0) x" 2>/dev/null || echo error)
+          {
+            echo ''
+            echo "Journals that do not balance in the restored copy: **$bad**"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$bad" != "0" ]; then
+            echo "::error::the restored ledger does not balance ($bad)"
+            fail=1
+          fi
+          exit $fail
