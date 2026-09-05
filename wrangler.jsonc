@@ -1,0 +1,21 @@
+{
+  // Cloudflare Workers, serving the built app as static assets.
+  //
+  // There is no Worker script: `assets` with no `main` is a static site, which
+  // is all this needs — the API is Supabase and the browser talks to it
+  // directly.
+  //
+  // not_found_handling is the setting the whole thing turns on. This is a
+  // single-page app: /reset, /dashboard and /carday are not files, they are
+  // routes the bundle decides. Without it Cloudflare looks for a file called
+  // reset, does not find one, and returns its own 404 — so a password reset
+  // link, which lands on exactly that path, tells the person the page does not
+  // exist. "single-page-application" serves index.html with a 200 instead and
+  // lets the router read the URL it was actually given.
+  "name": "samboza",
+  "compatibility_date": "2026-09-05",
+  "assets": {
+    "directory": "./app/dist",
+    "not_found_handling": "single-page-application"
+  }
+}
