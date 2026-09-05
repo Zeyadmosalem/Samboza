@@ -64,6 +64,23 @@ jobs:
               exit 1 ;;
           esac
 
+          # The pooler routes by TENANT, and the tenant is in the username:
+          # postgres.<project-ref>, not postgres. Get it wrong and the only
+          # thing it can say is "password authentication failed for user
+          # postgres" — which sends you off to reset a password that was
+          # never the problem. Only the username is read here; the password
+          # is never printed.
+          rest=${DB_URL#*://}
+          user=${rest%%:*}
+          case "$host:$user" in
+            *pooler.supabase.com:postgres)
+              echo "::error::The username is 'postgres'. The shared pooler needs the project on it:"
+              echo "::error::postgres.<project-ref> — copy the whole string from Supabase ->"
+              echo "::error::Settings -> Database -> Connection string -> Session pooler."
+              exit 1 ;;
+          esac
+          echo "as user ${user%%.*}.<ref>"
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
