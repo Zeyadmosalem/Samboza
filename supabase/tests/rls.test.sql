@@ -503,9 +503,15 @@ select is(
   (select amount_egp from remittances where currency = 'SAR'),
   1290000::bigint, 'and the EGP figure follows from the amount and the rate');
 
+-- The remittance's OWN cash line, not the account balance: by this point in
+-- the suite the family has paid three allowances and taken a handover, and an
+-- assertion that only holds when nothing else happened first is an assertion
+-- about the test, not about the code.
 select is(
-  (select balance::bigint from account_balances
-    where account_id = 'cccc0000-0000-4000-8000-000000000001'),
+  (select sum(e.amount)::bigint from entries e
+     join accounts a on a.id = e.account_id
+    where a.system_key = 'cash'
+      and e.journal_id = (select journal_id from remittances where currency = 'SAR')),
   1290000::bigint, 'the cash is in the family''s hands');
 
 -- The original amount is never overwritten (§3.7): the rate is part of the
@@ -531,8 +537,10 @@ select lives_ok(
   'a mistyped remittance is voided');
 
 select is(
-  (select balance::bigint from account_balances
-    where account_id = 'cccc0000-0000-4000-8000-000000000001'),
+  (select coalesce(sum(e.amount), 0)::bigint from entries e
+     join accounts a on a.id = e.account_id
+     join journals j on j.id = e.journal_id
+    where a.system_key = 'cash' and j.source_table = 'remittances'),
   0::bigint, 'and its entry is reversed rather than deleted');
 
 -- =====================================================================
